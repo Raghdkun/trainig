@@ -7,8 +7,9 @@ import {
     Trash2,
     Video,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
+import { toast } from 'sonner';
 import InputError from '@/components/input-error';
 import { VideoPlayer } from '@/components/training/video-player';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { uploadMediaInChunks } from '@/lib/chunked-upload';
 import { destroy, store } from '@/routes/training/media';
 import type { ChecklistItem, MediaLimits, MediaType } from '@/types/training';
 
@@ -40,6 +42,8 @@ export function MediaManager({ item }: { item: ChecklistItem }) {
     const { mediaLimits } = usePage<{ mediaLimits: MediaLimits }>().props;
     const [adding, setAdding] = useState(false);
     const [fileError, setFileError] = useState<string | null>(null);
+    const [uploadPercent, setUploadPercent] = useState<number | null>(null);
+    const abortRef = useRef<AbortController | null>(null);
     const form = useForm<{
         type: MediaType;
         url: string;
@@ -53,6 +57,7 @@ export function MediaManager({ item }: { item: ChecklistItem }) {
     });
 
     const limit = mediaLimits?.[form.data.type];
+    const uploading = uploadPercent !== null;
 
     /**
      * Reject an oversized file up front — sending it would tie up (or kill) the
@@ -73,22 +78,69 @@ export function MediaManager({ item }: { item: ChecklistItem }) {
         setFileError(null);
     }
 
+    function resetForm() {
+        form.reset();
+        setFileError(null);
+        setAdding(false);
+    }
+
+    /** Files upload in chunks (see uploadMediaInChunks); links post normally. */
+    async function uploadFile(file: File) {
+        const controller = new AbortController();
+        abortRef.current = controller;
+        setUploadPercent(0);
+
+        try {
+            await uploadMediaInChunks({
+                itemId: item.id,
+                type: form.data.type as 'image' | 'video' | 'file',
+                label: form.data.label,
+                file,
+                onProgress: (progress) => setUploadPercent(progress.percentage),
+                signal: controller.signal,
+            });
+
+            toast.success('Media added.');
+            resetForm();
+            router.reload({ only: ['section'] });
+        } catch (error) {
+            if (!controller.signal.aborted) {
+                toast.error(
+                    error instanceof Error
+                        ? error.message
+                        : 'The upload failed. Please try again.',
+                );
+            }
+        } finally {
+            setUploadPercent(null);
+            abortRef.current = null;
+        }
+    }
+
     function submit(event: FormEvent) {
         event.preventDefault();
 
-        if (fileError) {
+        if (fileError || uploading) {
             return;
         }
 
-        form.post(store(item.id).url, {
-            preserveScroll: true,
-            forceFormData: true,
-            onSuccess: () => {
-                form.reset();
-                setFileError(null);
-                setAdding(false);
-            },
-        });
+        if (form.data.type === 'link') {
+            form.post(store(item.id).url, {
+                preserveScroll: true,
+                onSuccess: resetForm,
+            });
+
+            return;
+        }
+
+        if (form.data.file) {
+            void uploadFile(form.data.file);
+        }
+    }
+
+    function cancelUpload() {
+        abortRef.current?.abort();
+        setUploadPercent(null);
     }
 
     const media = item.media ?? [];
@@ -221,17 +273,19 @@ export function MediaManager({ item }: { item: ChecklistItem }) {
                             <Input
                                 type="file"
                                 accept={limit?.accept}
+                                disabled={uploading}
                                 onChange={(e) =>
                                     pickFile(e.target.files?.[0] ?? null)
                                 }
                                 className="h-8"
                             />
-                            {limit && !fileError && !form.errors.file && (
+                            {limit && !fileError && (
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                    Up to {formatSize(limit.max_kb * 1024)}
+                                    Up to {formatSize(limit.max_kb * 1024)} ·
+                                    uploaded in chunks
                                 </p>
                             )}
-                            <InputError message={fileError ?? form.errors.file} />
+                            <InputError message={fileError ?? undefined} />
                         </div>
                     )}
 
@@ -239,21 +293,32 @@ export function MediaManager({ item }: { item: ChecklistItem }) {
                         value={form.data.label}
                         onChange={(e) => form.setData('label', e.target.value)}
                         placeholder="Label (optional)"
+                        disabled={uploading}
                         className="h-8 w-40"
                     />
 
                     <Button
                         type="submit"
                         size="sm"
-                        disabled={form.processing || fileError !== null}
+                        disabled={
+                            form.processing ||
+                            uploading ||
+                            fileError !== null
+                        }
                     >
-                        {form.processing ? 'Uploading…' : 'Add'}
+                        {uploading ? 'Uploading…' : 'Add'}
                     </Button>
                     <Button
                         type="button"
                         size="sm"
                         variant="ghost"
                         onClick={() => {
+                            if (uploading) {
+                                cancelUpload();
+
+                                return;
+                            }
+
                             setFileError(null);
                             setAdding(false);
                         }}
@@ -261,25 +326,23 @@ export function MediaManager({ item }: { item: ChecklistItem }) {
                         Cancel
                     </Button>
 
-                    {form.progress && (
+                    {uploading && (
                         <div className="w-full space-y-1">
                             <div
                                 className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
                                 role="progressbar"
-                                aria-valuenow={form.progress.percentage ?? 0}
+                                aria-valuenow={uploadPercent ?? 0}
                                 aria-valuemin={0}
                                 aria-valuemax={100}
                                 aria-label="Upload progress"
                             >
                                 <div
                                     className="h-full rounded-full bg-primary transition-[width]"
-                                    style={{
-                                        width: `${form.progress.percentage ?? 0}%`,
-                                    }}
+                                    style={{ width: `${uploadPercent ?? 0}%` }}
                                 />
                             </div>
                             <p className="text-xs text-muted-foreground tabular-nums">
-                                Uploading… {form.progress.percentage ?? 0}%
+                                Uploading… {uploadPercent ?? 0}%
                             </p>
                         </div>
                     )}

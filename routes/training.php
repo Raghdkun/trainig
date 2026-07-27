@@ -4,6 +4,7 @@ use App\Http\Controllers\Training\CategoryController;
 use App\Http\Controllers\Training\ChecklistItemController;
 use App\Http\Controllers\Training\EvaluationController;
 use App\Http\Controllers\Training\MediaController;
+use App\Http\Controllers\Training\MediaUploadController;
 use App\Http\Controllers\Training\SectionController;
 use App\Http\Controllers\Training\TraineeController;
 use App\Http\Controllers\Training\TraineeManagerController;
@@ -43,6 +44,12 @@ Route::middleware(['auth', 'verified', 'super_admin'])
         // Media
         Route::post('items/{checklistItem}/media', [MediaController::class, 'store'])->name('media.store');
         Route::delete('media/{media}', [MediaController::class, 'destroy'])->name('media.destroy');
+
+        // Chunked/resumable uploads for large files (video).
+        Route::post('items/{checklistItem}/media/uploads', [MediaUploadController::class, 'init'])->name('media.uploads.init');
+        Route::post('media/uploads/{upload}/chunk', [MediaUploadController::class, 'chunk'])->name('media.uploads.chunk');
+        Route::post('media/uploads/{upload}/complete', [MediaUploadController::class, 'complete'])->name('media.uploads.complete');
+        Route::delete('media/uploads/{upload}', [MediaUploadController::class, 'cancel'])->name('media.uploads.cancel');
     });
 
 /*

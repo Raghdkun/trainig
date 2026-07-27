@@ -43,6 +43,23 @@ enum MediaType: string
     }
 
     /**
+     * The validation rules for an uploaded `file` of this type. Shared by the
+     * direct-upload request and the chunked-upload finaliser so both enforce
+     * exactly the same constraints.
+     *
+     * @return array<int, string>
+     */
+    public function fileValidationRules(): array
+    {
+        return match ($this) {
+            self::Image => ['required', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:'.$this->maxKilobytes()],
+            self::Video => ['required', 'file', 'mimetypes:video/mp4,video/quicktime,video/webm', 'max:'.$this->maxKilobytes()],
+            self::File => ['required', 'file', 'mimes:pdf,doc,docx,xlsx,csv,txt', 'max:'.$this->maxKilobytes()],
+            self::Link => [],
+        };
+    }
+
+    /**
      * The `accept` attribute for the file picker, so the OS dialog filters to
      * what the server will actually take.
      */

@@ -91,14 +91,12 @@ trait TrainingValidationRules
             'file' => ['nullable', 'file'],
         ];
 
-        if ($type === MediaType::Link->value) {
+        $mediaType = MediaType::tryFrom((string) $type);
+
+        if ($mediaType === MediaType::Link) {
             $rules['url'] = ['required', 'url', 'max:2048'];
-        } elseif ($type === MediaType::Image->value) {
-            $rules['file'] = ['required', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:'.MediaType::Image->maxKilobytes()];
-        } elseif ($type === MediaType::Video->value) {
-            $rules['file'] = ['required', 'file', 'mimetypes:video/mp4,video/quicktime,video/webm', 'max:'.MediaType::Video->maxKilobytes()];
-        } elseif ($type === MediaType::File->value) {
-            $rules['file'] = ['required', 'file', 'mimes:pdf,doc,docx,xlsx,csv,txt', 'max:'.MediaType::File->maxKilobytes()];
+        } elseif ($mediaType?->isUploaded()) {
+            $rules['file'] = $mediaType->fileValidationRules();
         }
 
         return $rules;
