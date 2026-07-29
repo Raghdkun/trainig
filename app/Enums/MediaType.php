@@ -28,16 +28,19 @@ enum MediaType: string
     }
 
     /**
-     * Maximum upload size in KILOBYTES (Laravel's `max:` unit). Keep these at or
-     * below the PHP limits shipped in `public/.user.ini` — a file larger than
-     * the server can ingest kills the request before Laravel can answer.
+     * Maximum upload size in KILOBYTES (Laravel's `max:` unit).
+     *
+     * Uploads are chunked (see MediaUploadController), so these ceilings are NOT
+     * bounded by the PHP `post_max_size` — each request only ever carries a
+     * single ~5 MB chunk. The server just needs its body limit to exceed one
+     * chunk (the shipped 64M/68M is ample); the total can be far larger.
      */
     public function maxKilobytes(): int
     {
         return match ($this) {
-            self::Image => 5 * 1024,    // 5 MB
-            self::Video => 50 * 1024,   // 50 MB
-            self::File => 10 * 1024,    // 10 MB
+            self::Image => 5 * 1024,      // 5 MB
+            self::Video => 500 * 1024,    // 500 MB (uploaded in chunks)
+            self::File => 10 * 1024,      // 10 MB
             self::Link => 0,
         };
     }

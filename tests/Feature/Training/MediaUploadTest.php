@@ -97,6 +97,10 @@ class MediaUploadTest extends TestCase
             $this->assertGreaterThan(0, $limits[$type]['max_kb']);
             $this->assertNotSame('', $limits[$type]['accept']);
         }
+
+        // Video is chunk-uploaded, so its ceiling is far above the PHP body
+        // limit — pin it so a regression that quietly shrinks it is caught.
+        $this->assertSame(500 * 1024, $limits['video']['max_kb']);
     }
 
     public function test_super_admin_can_delete_media_and_its_file(): void

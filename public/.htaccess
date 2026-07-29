@@ -1,6 +1,8 @@
 # Upload limits for mod_php hosts (PHP-FPM/CGI hosts read public/.user.ini
-# instead). Must stay >= the app's own media rules, or large video uploads die
-# mid-request and Apache reports a bare 503.
+# instead). Media uploads are CHUNKED (see MediaUploadController), so each
+# request only carries a single ~5 MB chunk — these limits just need to clear
+# one chunk plus form fields, NOT the whole video. That's why a 500 MB video
+# limit needs no change here. Don't lower below ~10M or chunks start failing.
 <IfModule mod_php.c>
     php_value upload_max_filesize 64M
     php_value post_max_size 68M
