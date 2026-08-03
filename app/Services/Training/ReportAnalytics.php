@@ -392,7 +392,7 @@ class ReportAnalytics
 
         $done = $this->groupedCompleted($scope, 'checklist_items.importance', $leafIds);
 
-        $keys = ['highly_important', 'needs_review', 'not_necessary', null];
+        $keys = ['highly_important', 'moderately_important', 'optional', null];
 
         return array_map(function (?string $key) use ($scored, $done, $leafByImportance, $traineeCount): array {
             $stats = $scored[(string) $key] ?? null;

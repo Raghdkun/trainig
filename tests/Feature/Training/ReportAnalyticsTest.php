@@ -227,7 +227,7 @@ class ReportAnalyticsTest extends TestCase
         $store = Store::factory()->create();
         $category = Category::factory()->create();
         $critical = ChecklistItem::factory()->create(['category_id' => $category->id, 'importance' => 'highly_important']);
-        $minor = ChecklistItem::factory()->create(['category_id' => $category->id, 'importance' => 'not_necessary']);
+        $minor = ChecklistItem::factory()->create(['category_id' => $category->id, 'importance' => 'optional']);
         $trainee = Trainee::factory()->forStore($store)->create();
 
         $this->evaluate($trainee, $critical, rating: 40);
@@ -236,7 +236,7 @@ class ReportAnalyticsTest extends TestCase
         $rows = collect($this->analytics()->importanceBreakdown($this->analytics()->for($admin)))->keyBy('importance');
 
         $this->assertSame(40.0, $rows['highly_important']['average_score']);
-        $this->assertSame(100.0, $rows['not_necessary']['average_score']);
+        $this->assertSame(100.0, $rows['optional']['average_score']);
     }
 
     public function test_manager_scope_only_sees_assigned_trainees(): void

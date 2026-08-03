@@ -98,7 +98,7 @@ class ContentAuthorizationTest extends TestCase
         // Sub-item under the parent.
         $this->actingAs($admin)->post(route('training.items.store', $category), [
             'title' => 'Sub step',
-            'importance' => 'needs_review',
+            'importance' => 'moderately_important',
             'parent_id' => $item->id,
         ])->assertSessionHasNoErrors();
         $this->assertDatabaseHas('checklist_items', ['title' => 'Sub step', 'parent_id' => $item->id]);

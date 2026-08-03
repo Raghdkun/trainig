@@ -61,7 +61,7 @@ class ContentMutationTest extends TestCase
         $b = ChecklistItem::factory()->create(['category_id' => $category->id, 'order' => 1]);
 
         $this->actingAs($this->admin())
-            ->put(route('training.items.update', $a), ['title' => 'Updated', 'importance' => 'needs_review'])
+            ->put(route('training.items.update', $a), ['title' => 'Updated', 'importance' => 'moderately_important'])
             ->assertSessionHasNoErrors();
         $this->assertSame('Updated', $a->refresh()->title);
 

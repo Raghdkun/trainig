@@ -4,16 +4,20 @@ namespace App\Enums;
 
 enum Importance: string
 {
-    case NotNecessary = 'not_necessary';
+    // Ordered low → high so `cases()` reads in ascending priority. The
+    // `highly_important` value is unchanged from the old taxonomy; `optional`
+    // and `moderately_important` replace `not_necessary` and `needs_review`
+    // (see the rename_importance_values migration for existing rows).
+    case Optional = 'optional';
+    case ModeratelyImportant = 'moderately_important';
     case HighlyImportant = 'highly_important';
-    case NeedsReview = 'needs_review';
 
     public function label(): string
     {
         return match ($this) {
-            self::NotNecessary => 'Not Necessary',
-            self::HighlyImportant => 'Highly Important',
-            self::NeedsReview => 'Needs Review',
+            self::Optional => 'Optional',
+            self::ModeratelyImportant => 'Moderately important',
+            self::HighlyImportant => 'Highly important',
         };
     }
 
@@ -23,9 +27,9 @@ enum Importance: string
     public function color(): string
     {
         return match ($this) {
-            self::NotNecessary => 'slate',
+            self::Optional => 'slate',
+            self::ModeratelyImportant => 'amber',
             self::HighlyImportant => 'red',
-            self::NeedsReview => 'amber',
         };
     }
 }

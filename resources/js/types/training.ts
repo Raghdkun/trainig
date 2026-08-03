@@ -1,4 +1,4 @@
-export type Importance = 'not_necessary' | 'highly_important' | 'needs_review';
+export type Importance = 'optional' | 'moderately_important' | 'highly_important';
 
 export type MediaType = 'link' | 'file' | 'image' | 'video';
 
@@ -61,9 +61,9 @@ export type MoveTarget = {
 };
 
 export const IMPORTANCE_OPTIONS: { value: Importance; label: string }[] = [
-    { value: 'highly_important', label: 'Highly Important' },
-    { value: 'needs_review', label: 'Needs Review' },
-    { value: 'not_necessary', label: 'Not Necessary' },
+    { value: 'optional', label: 'Optional' },
+    { value: 'moderately_important', label: 'Moderately important' },
+    { value: 'highly_important', label: 'Highly important' },
 ];
 
 export type StoreOption = { id: number; name: string };
