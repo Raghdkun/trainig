@@ -144,24 +144,28 @@ function EvaluationLeaf({
     const isCurrent = item.id === currentStepId;
     const stepRef = useCurrentStep(isCurrent);
 
-    const canComplete = rating !== null && notes.trim() !== '';
+    // A not-rated item is just "done / not done" — no score or note gate.
+    const scored = item.requires_rating;
+    const canComplete = !scored || (rating !== null && notes.trim() !== '');
 
     function save(
         nextCompleted: boolean,
         nextRating: number | null,
         nextNotes: string,
     ) {
-        // Invariant: an item can only be complete when it has a score and a note.
-        const valid = nextRating !== null && nextNotes.trim() !== '';
+        // Invariant: a scored item can only complete with a score and a note; a
+        // not-rated item never carries a score.
+        const valid = !scored || (nextRating !== null && nextNotes.trim() !== '');
         const finalCompleted = nextCompleted && valid;
+        const finalRating = scored ? nextRating : null;
 
         setCompleted(finalCompleted);
-        setRating(nextRating);
+        setRating(finalRating);
         setNotes(nextNotes);
 
         persist(traineeId, item.id, {
             completed: finalCompleted,
-            rating: nextRating,
+            rating: finalRating,
             notes: nextNotes.trim() === '' ? null : nextNotes,
         });
     }
@@ -229,18 +233,18 @@ function EvaluationLeaf({
 
                     <MediaAttachments media={item.media} />
 
-                    <RatingInput value={rating} onChange={rate} />
+                    {scored && <RatingInput value={rating} onChange={rate} />}
 
                     <Textarea
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         onBlur={commitNotes}
-                        placeholder="Add a note…"
+                        placeholder={scored ? 'Add a note…' : 'Add a note (optional)…'}
                         className="min-h-0 resize-none py-1.5 text-sm"
                         rows={2}
                     />
 
-                    {!completed && !canComplete && (
+                    {scored && !completed && !canComplete && (
                         <p className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Lock className="size-3" />
                             Add a score and a note to mark this step complete.

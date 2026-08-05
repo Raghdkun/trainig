@@ -56,6 +56,9 @@ trait TrainingValidationRules
             'title' => ['required', 'string', 'max:255'],
             'content' => ['nullable', 'string', 'max:10000'],
             'importance' => ['nullable', new Enum(Importance::class)],
+            // Optional: absent leaves the value unchanged (DB defaults to true),
+            // so partial updates and older clients keep working.
+            'requires_rating' => ['sometimes', 'boolean'],
             'parent_id' => [
                 'nullable',
                 Rule::exists('checklist_items', 'id')->where('category_id', $categoryId),

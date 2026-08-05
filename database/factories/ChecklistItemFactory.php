@@ -23,8 +23,19 @@ class ChecklistItemFactory extends Factory
             'title' => fake()->sentence(),
             'content' => fake()->optional()->paragraph(),
             'importance' => fake()->randomElement(Importance::cases()),
+            'requires_rating' => true,
             'order' => 0,
         ];
+    }
+
+    /**
+     * An item that is just "done / not done" — no score required to complete.
+     */
+    public function withoutRating(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'requires_rating' => false,
+        ]);
     }
 
     /**

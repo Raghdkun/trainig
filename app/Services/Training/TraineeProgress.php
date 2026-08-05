@@ -102,6 +102,7 @@ class TraineeProgress
                 'title' => $item->title,
                 'content' => $item->content,
                 'importance' => $item->importance,
+                'requires_rating' => $item->requires_rating,
                 'order' => $item->order,
                 'media' => $item->media,
                 'children' => $children,

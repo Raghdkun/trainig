@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $title
  * @property string|null $content
  * @property Importance $importance
+ * @property bool $requires_rating
  * @property int $order
  * @property-read Category $category
  * @property-read ChecklistItem|null $parent
@@ -30,7 +31,7 @@ class ChecklistItem extends Model
     use HasFactory;
 
     /** @var list<string> */
-    protected $fillable = ['category_id', 'parent_id', 'title', 'content', 'importance', 'order'];
+    protected $fillable = ['category_id', 'parent_id', 'title', 'content', 'importance', 'requires_rating', 'order'];
 
     /**
      * @return array<string, string>
@@ -39,6 +40,7 @@ class ChecklistItem extends Model
     {
         return [
             'importance' => Importance::class,
+            'requires_rating' => 'boolean',
         ];
     }
 

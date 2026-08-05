@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -49,6 +50,7 @@ export function ItemFormDialog({
         title: item?.title ?? '',
         content: item?.content ?? '',
         importance: (item?.importance ?? 'none') as ImportanceChoice,
+        requires_rating: item?.requires_rating ?? true,
         parent_id: item?.parent_id ?? parentId,
     });
 
@@ -156,6 +158,32 @@ export function ItemFormDialog({
                             </SelectContent>
                         </Select>
                         <InputError message={form.errors.importance} />
+                    </div>
+
+                    <div className="flex items-start gap-3 rounded-md border p-3">
+                        <Checkbox
+                            id="item-requires-rating"
+                            checked={form.data.requires_rating}
+                            onCheckedChange={(value) =>
+                                form.setData('requires_rating', value === true)
+                            }
+                            className="mt-0.5"
+                        />
+                        <div className="grid gap-1">
+                            <Label
+                                htmlFor="item-requires-rating"
+                                className="font-medium"
+                            >
+                                Requires a score
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                                When off, the manager just checks this step
+                                done — no score or note needed.
+                            </p>
+                            <InputError
+                                message={form.errors.requires_rating}
+                            />
+                        </div>
                     </div>
 
                     <DialogFooter>

@@ -25,6 +25,7 @@ export type ChecklistItem = {
     title: string;
     content: string | null;
     importance: Importance | null;
+    requires_rating: boolean;
     order: number;
     children?: ChecklistItem[];
     media?: MediaItem[];
@@ -104,6 +105,7 @@ export type EvaluationItem = {
     title: string;
     content: string | null;
     importance: Importance | null;
+    requires_rating: boolean;
     order: number;
     media: MediaItem[];
     children: EvaluationItem[];
