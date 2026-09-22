@@ -29,25 +29,36 @@ class ReportController extends Controller
         $scope = $this->analytics->for($user, [
             'store' => $request->integer('store') ?: null,
             'weeks' => $request->integer('weeks') ?: null,
+            'includeArchived' => $request->boolean('includeArchived'),
         ]);
 
-        return Inertia::render('reports/index', [
+        $props = [
             'isSuperAdmin' => $user->isSuperAdmin(),
-            'canChooseStore' => $user->isSuperAdmin(),
-            'storeOptions' => $user->isSuperAdmin()
-                ? Store::orderBy('name')->get(['id', 'name'])
+            'canChooseStore' => $user->canFilterByStore(),
+            'storeOptions' => $user->canFilterByStore()
+                ? ($user->isSuperAdmin() ? Store::orderBy('name')->get(['id', 'name']) : $user->stores()->orderBy('stores.name')->get(['stores.id', 'stores.name']))
                 : [],
             'weekOptions' => ReportAnalytics::WEEK_OPTIONS,
-            'filters' => ['store' => $scope->storeId, 'weeks' => $scope->weeks],
+            'filters' => ['store' => $scope->storeId, 'weeks' => $scope->weeks, 'includeArchived' => $scope->includeArchived],
             'overview' => $this->analytics->overview($scope),
             'trend' => Inertia::defer(fn () => $this->analytics->completionTrend($scope), 'reports'),
             'distribution' => Inertia::defer(fn () => $this->analytics->scoreDistribution($scope), 'reports'),
+            'developmentZone' => Inertia::defer(fn () => $this->analytics->developmentZone($scope), 'reports'),
             'storePerformance' => Inertia::defer(fn () => $this->analytics->storePerformance($scope), 'reports'),
             'managerActivity' => Inertia::defer(fn () => $this->analytics->managerActivity($scope), 'reports'),
             'traineeStatus' => Inertia::defer(fn () => $this->analytics->traineeStatus($scope), 'reports'),
             'stationInsights' => Inertia::defer(fn () => $this->analytics->stationInsights($scope), 'reports'),
             'importanceBreakdown' => Inertia::defer(fn () => $this->analytics->importanceBreakdown($scope), 'reports'),
-        ]);
+        ];
+
+        // Quiz results are training-team-only everywhere else in the app
+        // (see routes/training.php's quiz-results group) — keep that rule
+        // here too, rather than exposing manager-visible quiz data.
+        if ($user->isSuperAdmin()) {
+            $props['quizSummary'] = Inertia::defer(fn () => $this->analytics->quizSummary($scope), 'reports');
+        }
+
+        return Inertia::render('reports/index', $props);
     }
 
     /**
@@ -61,11 +72,13 @@ class ReportController extends Controller
             'report' => ['nullable', Rule::in(['trainees', 'stores', 'managers', 'stations'])],
             'store' => ['nullable', 'integer', 'exists:stores,id'],
             'weeks' => ['nullable', 'integer'],
+            'includeArchived' => ['nullable', 'boolean'],
         ]);
 
         $scope = $this->analytics->for($request->user(), [
             'store' => $request->integer('store') ?: null,
             'weeks' => $request->integer('weeks') ?: null,
+            'includeArchived' => $request->boolean('includeArchived'),
         ]);
 
         if ($request->string('format')->toString() === 'pdf') {

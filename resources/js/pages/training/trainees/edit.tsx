@@ -13,7 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { index, update } from '@/routes/trainees';
+import { edit, index, show, update } from '@/routes/trainees';
 import type { BreadcrumbItem } from '@/types';
 import type { StoreOption } from '@/types/training';
 
@@ -137,6 +137,10 @@ export default function TraineeEdit() {
     );
 }
 
-const breadcrumbs: BreadcrumbItem[] = [{ title: 'Trainees', href: index() }];
-
-TraineeEdit.layout = { breadcrumbs };
+TraineeEdit.layout = (page: { trainee: EditableTrainee }) => ({
+    breadcrumbs: [
+        { title: 'Trainees', href: index() },
+        { title: page.trainee.name, href: show(page.trainee.id) },
+        { title: 'Edit', href: edit(page.trainee.id) },
+    ] satisfies BreadcrumbItem[],
+});

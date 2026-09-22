@@ -1,22 +1,21 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeft, Layers, Pencil, Plus } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, Layers, Pencil, Plus } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import Heading from '@/components/heading';
-import {
-    BuilderSelectionProvider
-    
-} from '@/components/training/builder-selection';
-import type {SelectionKind} from '@/components/training/builder-selection';
+import { BuilderSelectionProvider } from '@/components/training/builder-selection';
+import type { SelectionKind } from '@/components/training/builder-selection';
 import { BulkActionBar } from '@/components/training/bulk-action-bar';
 import { CategoryBlock } from '@/components/training/category-block';
 import { CategoryFormDialog } from '@/components/training/category-form-dialog';
+import { QuizManager } from '@/components/training/quiz-manager';
 import { SectionFormDialog } from '@/components/training/section-form-dialog';
+import { SectionStatusBadge } from '@/components/training/section-status-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useSortable } from '@/hooks/use-sortable';
 import { reorder } from '@/routes/training/categories';
-import { index } from '@/routes/training/sections';
+import { edit, index, publish, unpublish } from '@/routes/training/sections';
 import type { BreadcrumbItem } from '@/types';
 import type { MoveTarget, Section } from '@/types/training';
 
@@ -95,18 +94,54 @@ export default function BuilderSection() {
                             title={section.title}
                             description={section.description ?? undefined}
                         />
-                        {timing.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5">
-                                {timing.map((label) => (
-                                    <Badge key={label} variant="outline">
-                                        {label}
-                                    </Badge>
-                                ))}
-                            </div>
-                        )}
+                        <div className="flex flex-wrap gap-1.5">
+                            <SectionStatusBadge status={section.status} />
+                            {timing.map((label) => (
+                                <Badge key={label} variant="outline">
+                                    {label}
+                                </Badge>
+                            ))}
+                        </div>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
+                        {section.status === 'published' ? (
+                            <Button
+                                variant="outline"
+                                onClick={() =>
+                                    router.patch(
+                                        unpublish(section.id).url,
+                                        {},
+                                        {
+                                            preserveScroll: true,
+                                            // The Content Builder list and
+                                            // Dashboard "Stations" count are
+                                            // reached via prefetching nav
+                                            // links — flush so they don't
+                                            // keep serving stale counts.
+                                            onSuccess: () => router.flushAll(),
+                                        },
+                                    )
+                                }
+                            >
+                                <EyeOff className="size-4" /> Unpublish
+                            </Button>
+                        ) : (
+                            <Button
+                                onClick={() =>
+                                    router.patch(
+                                        publish(section.id).url,
+                                        {},
+                                        {
+                                            preserveScroll: true,
+                                            onSuccess: () => router.flushAll(),
+                                        },
+                                    )
+                                }
+                            >
+                                <Eye className="size-4" /> Publish
+                            </Button>
+                        )}
                         <SectionFormDialog
                             section={section}
                             trigger={
@@ -125,6 +160,11 @@ export default function BuilderSection() {
                         />
                     </div>
                 </div>
+
+                <QuizManager
+                    sectionId={section.id}
+                    quiz={section.quiz ?? null}
+                />
 
                 {list.length === 0 ? (
                     <Card className="flex flex-col items-center justify-center gap-3 border-dashed p-12 text-center">
@@ -160,8 +200,9 @@ export default function BuilderSection() {
     );
 }
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Content builder', href: index() },
-];
-
-BuilderSection.layout = { breadcrumbs };
+BuilderSection.layout = (page: { section: Section }) => ({
+    breadcrumbs: [
+        { title: 'Content builder', href: index() },
+        { title: page.section.title, href: edit(page.section.id) },
+    ] satisfies BreadcrumbItem[],
+});

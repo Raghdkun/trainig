@@ -31,13 +31,30 @@ class TraineePolicy
         return $user->isManager();
     }
 
+    /**
+     * A manager may update a trainee while active (including archiving
+     * them). Once a trainee is archived, they're history — only a super
+     * admin may make further changes (handled by Gate::before).
+     */
     public function update(User $user, Trainee $trainee): bool
     {
+        if ($trainee->isArchived()) {
+            return false;
+        }
+
         return $this->isAssigned($user, $trainee);
     }
 
+    /**
+     * Same archived-is-frozen rule as update() — a manager may delete a
+     * trainee they're assigned to only while still active.
+     */
     public function delete(User $user, Trainee $trainee): bool
     {
+        if ($trainee->isArchived()) {
+            return false;
+        }
+
         return $this->isAssigned($user, $trainee);
     }
 
@@ -53,6 +70,42 @@ class TraineePolicy
      * Reassigning managers is reserved for super admins (handled by Gate::before).
      */
     public function assignManagers(User $user, Trainee $trainee): bool
+    {
+        return false;
+    }
+
+    /**
+     * A manager may add one of their assigned trainees to the Development
+     * Zone and submit the rubric evaluation that starts it.
+     */
+    public function addToDevelopmentZone(User $user, Trainee $trainee): bool
+    {
+        return $this->isAssigned($user, $trainee);
+    }
+
+    /**
+     * Building or editing a trainee's development plan is an admin-only
+     * judgment call, reserved for super admins (handled by Gate::before).
+     */
+    public function manageDevelopmentPlan(User $user, Trainee $trainee): bool
+    {
+        return false;
+    }
+
+    /**
+     * Marking a trainee's development complete is reserved for super admins
+     * (handled by Gate::before).
+     */
+    public function completeDevelopment(User $user, Trainee $trainee): bool
+    {
+        return false;
+    }
+
+    /**
+     * Removing a trainee from the Development Zone entirely is reserved for
+     * super admins (handled by Gate::before).
+     */
+    public function removeFromDevelopmentZone(User $user, Trainee $trainee): bool
     {
         return false;
     }

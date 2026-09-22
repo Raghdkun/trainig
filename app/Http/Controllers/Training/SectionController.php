@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Training;
 
+use App\Enums\SectionStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Training\ReorderRequest;
 use App\Http\Requests\Training\SectionRequest;
 use App\Models\Category;
 use App\Models\Section;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -15,16 +17,26 @@ use Inertia\Response;
 class SectionController extends Controller
 {
     /**
-     * Builder home: every section with category/item counts.
+     * Builder home: every section with category/item counts, optionally
+     * filtered to just drafts or published stations.
      */
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $status = SectionStatus::tryFrom((string) $request->query('status'));
+
         $sections = Section::ordered()
+            ->when($status, fn ($query) => $query->where('status', $status))
             ->withCount(['categories', 'checklistItems'])
             ->get();
 
         return Inertia::render('training/builder/index', [
             'sections' => $sections,
+            'filters' => ['status' => $status?->value],
+            'statusCounts' => [
+                'all' => Section::count(),
+                'draft' => Section::draft()->count(),
+                'published' => Section::published()->count(),
+            ],
         ]);
     }
 
@@ -37,6 +49,7 @@ class SectionController extends Controller
             'categories' => fn ($query) => $query->orderBy('order'),
             'categories.items.children.media',
             'categories.items.media',
+            'quiz.questions.options',
         ]);
 
         return Inertia::render('training/builder/section', [
@@ -73,6 +86,7 @@ class SectionController extends Controller
         Section::create([
             ...$request->validated(),
             'order' => (int) Section::max('order') + 1,
+            'status' => SectionStatus::Draft,
         ]);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Section created.')]);
@@ -85,6 +99,31 @@ class SectionController extends Controller
         $section->update($request->validated());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Section updated.')]);
+
+        return back();
+    }
+
+    /**
+     * Make a station visible to trainees/managers and countable in reports.
+     */
+    public function publish(Section $section): RedirectResponse
+    {
+        $section->update(['status' => SectionStatus::Published]);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Station published.')]);
+
+        return back();
+    }
+
+    /**
+     * Pull a station back to draft — hidden from trainees/managers and
+     * excluded from reports until republished.
+     */
+    public function unpublish(Section $section): RedirectResponse
+    {
+        $section->update(['status' => SectionStatus::Draft]);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Station moved back to draft.')]);
 
         return back();
     }

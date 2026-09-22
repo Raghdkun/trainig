@@ -2,9 +2,14 @@
 
 namespace Tests\Feature\Training;
 
+use App\Enums\DevelopmentStatus;
 use App\Models\Category;
 use App\Models\ChecklistItem;
+use App\Models\DevelopmentEvaluation;
+use App\Models\DevelopmentEvaluationCriterion;
 use App\Models\Evaluation;
+use App\Models\Quiz;
+use App\Models\QuizAttempt;
 use App\Models\Section;
 use App\Models\Store;
 use App\Models\Trainee;
@@ -275,5 +280,50 @@ class ReportAnalyticsTest extends TestCase
 
         $this->assertSame(1, $filtered['trainees']);
         $this->assertSame(30.0, $filtered['average_score']);
+    }
+
+    public function test_development_zone_reports_pipeline_counts_and_plan_completion(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+        $store = Store::factory()->create();
+        $criterion = DevelopmentEvaluationCriterion::factory()->create();
+
+        $pending = Trainee::factory()->forStore($store)->developmentStatus(DevelopmentStatus::Pending)->create();
+        $evaluation = DevelopmentEvaluation::factory()->create(['trainee_id' => $pending->id]);
+        $evaluation->ratings()->create(['development_evaluation_criterion_id' => $criterion->id, 'rating' => 4]);
+
+        $active = Trainee::factory()->forStore($store)->developmentStatus(DevelopmentStatus::Active)->create();
+        [$planItem] = $this->items(1);
+        $active->developmentItems()->attach($planItem->id);
+        $this->evaluate($active, $planItem, rating: 100);
+
+        Trainee::factory()->forStore($store)->developmentStatus(DevelopmentStatus::Completed)->create();
+        Trainee::factory()->forStore($store)->create(); // not in the zone at all
+
+        $result = $this->analytics()->developmentZone($this->analytics()->for($admin));
+
+        $this->assertSame(1, $result['pending']);
+        $this->assertSame(1, $result['active']);
+        $this->assertSame(1, $result['completed']);
+        $this->assertSame(3, $result['in_zone']);
+        $this->assertSame(4.0, $result['average_evaluation_rating']);
+        $this->assertSame(100, $result['plan_completion']); // the one plan item, fully done
+    }
+
+    public function test_quiz_summary_reports_sent_completed_and_average_score(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+        $store = Store::factory()->create();
+        $trainee = Trainee::factory()->forStore($store)->create();
+        [$quizA, $quizB] = [Quiz::factory()->create(), Quiz::factory()->create()];
+
+        QuizAttempt::factory()->create(['trainee_id' => $trainee->id, 'quiz_id' => $quizA->id]); // sent only
+        QuizAttempt::factory()->completed(80)->create(['trainee_id' => $trainee->id, 'quiz_id' => $quizB->id]);
+
+        $result = $this->analytics()->quizSummary($this->analytics()->for($admin));
+
+        $this->assertSame(2, $result['sent']);
+        $this->assertSame(1, $result['completed']);
+        $this->assertSame(80.0, $result['average_score']);
     }
 }

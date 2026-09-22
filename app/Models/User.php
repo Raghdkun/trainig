@@ -84,4 +84,33 @@ class User extends Authenticatable implements PasskeyUser
     {
         return $this->role === Role::Manager;
     }
+
+    /**
+     * Whether this user is allowed to switch between stores at all — super
+     * admins always can; a manager only needs it when assigned to more than
+     * one store (a single-store manager is already implicitly scoped).
+     */
+    public function canFilterByStore(): bool
+    {
+        return $this->isSuperAdmin() || $this->stores()->count() > 1;
+    }
+
+    /**
+     * Resolve a requested store id against what this user may actually filter
+     * by. Super admins may pick any store; a manager may only pick one of
+     * their own. Returns null (no filter / "all") when the request is empty
+     * or not permitted.
+     */
+    public function resolveStoreFilter(?int $requestedStoreId): ?int
+    {
+        if ($requestedStoreId === null) {
+            return null;
+        }
+
+        if ($this->isSuperAdmin()) {
+            return $requestedStoreId;
+        }
+
+        return $this->stores()->whereKey($requestedStoreId)->exists() ? $requestedStoreId : null;
+    }
 }

@@ -13,7 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { index, store } from '@/routes/trainees';
+import { create, index, store } from '@/routes/trainees';
 import type { BreadcrumbItem } from '@/types';
 import type { StoreOption } from '@/types/training';
 
@@ -130,6 +130,9 @@ export default function TraineeCreate() {
     );
 }
 
-const breadcrumbs: BreadcrumbItem[] = [{ title: 'Trainees', href: index() }];
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Trainees', href: index() },
+    { title: 'Add trainee', href: create() },
+];
 
 TraineeCreate.layout = { breadcrumbs };

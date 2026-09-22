@@ -13,3 +13,4 @@ require __DIR__.'/settings.php';
 require __DIR__.'/training.php';
 require __DIR__.'/admin.php';
 require __DIR__.'/reports.php';
+require __DIR__.'/quiz.php';

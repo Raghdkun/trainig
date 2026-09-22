@@ -12,20 +12,51 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { useStoreFilter, useSyncStoreFilter } from '@/hooks/use-store-filter';
 import { create, index, show } from '@/routes/trainees';
 import type { BreadcrumbItem } from '@/types';
-import type { StoreOption, TraineeSummary } from '@/types/training';
+import type {
+    StoreOption,
+    TraineeStatusCounts,
+    TraineeSummary,
+} from '@/types/training';
+
+type TraineeTab = 'active' | 'archived';
 
 export default function TraineesIndex() {
-    const { trainees, stores, filters, canChooseStore } = usePage<{
-        trainees: TraineeSummary[];
-        stores: StoreOption[];
-        filters: { store: number | null };
-        canChooseStore: boolean;
-    }>().props;
+    const { trainees, stores, filters, canChooseStore, traineeCounts } =
+        usePage<{
+            trainees: TraineeSummary[];
+            stores: StoreOption[];
+            filters: { store: number | null; tab: TraineeTab };
+            canChooseStore: boolean;
+            traineeCounts: TraineeStatusCounts;
+        }>().props;
 
-    function filterStore(value: string) {
-        router.get(index().url, value === 'all' ? {} : { store: value }, {
+    const { setSelectedStoreId } = useStoreFilter();
+    useSyncStoreFilter(filters.store);
+
+    function applyFilters(next: { store?: string; tab?: TraineeTab }) {
+        const store =
+            next.store ?? (filters.store ? String(filters.store) : 'all');
+        const tab = next.tab ?? filters.tab;
+
+        if (next.store !== undefined) {
+            setSelectedStoreId(store === 'all' ? null : Number(store));
+        }
+
+        const params: Record<string, string> = {};
+
+        if (store !== 'all') {
+            params.store = store;
+        }
+
+        if (tab !== 'active') {
+            params.tab = tab;
+        }
+
+        router.get(index().url, params, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -50,7 +81,9 @@ export default function TraineesIndex() {
                                         ? String(filters.store)
                                         : 'all'
                                 }
-                                onValueChange={filterStore}
+                                onValueChange={(store) =>
+                                    applyFilters({ store })
+                                }
                             >
                                 <SelectTrigger className="w-40">
                                     <SelectValue placeholder="All stores" />
@@ -81,12 +114,30 @@ export default function TraineesIndex() {
                     </div>
                 </div>
 
+                <ToggleGroup
+                    type="single"
+                    variant="outline"
+                    value={filters.tab}
+                    onValueChange={(tab) =>
+                        tab && applyFilters({ tab: tab as TraineeTab })
+                    }
+                    className="w-full justify-start overflow-x-auto sm:w-auto"
+                >
+                    <ToggleGroupItem value="active">
+                        Active ({traineeCounts.active})
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="archived">
+                        Archived ({traineeCounts.archived})
+                    </ToggleGroupItem>
+                </ToggleGroup>
+
                 {trainees.length === 0 ? (
                     <Card className="flex flex-col items-center justify-center gap-3 border-dashed p-12 text-center">
                         <Users className="size-10 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground">
-                            No trainees yet. Add a trainee to start tracking
-                            their training.
+                            {filters.tab === 'archived'
+                                ? 'No archived trainees.'
+                                : 'No trainees yet. Add a trainee to start tracking their training.'}
                         </p>
                     </Card>
                 ) : (

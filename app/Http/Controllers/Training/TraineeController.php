@@ -28,10 +28,14 @@ class TraineeController extends Controller
         $this->authorize('viewAny', Trainee::class);
 
         $user = $request->user();
-        $storeId = $user->isSuperAdmin() ? $request->integer('store') ?: null : null;
+        $canChooseStore = $user->canFilterByStore();
+        $storeId = $user->resolveStoreFilter($request->integer('store') ?: null);
+        $tab = $request->query('tab') === 'archived' ? 'archived' : 'active';
 
-        $trainees = Trainee::visibleTo($user)
-            ->inStore($storeId)
+        $visible = Trainee::visibleTo($user)->inStore($storeId);
+
+        $trainees = (clone $visible)
+            ->when($tab === 'archived', fn ($query) => $query->archived(), fn ($query) => $query->active())
             ->with('store')
             ->orderBy('name')
             ->get();
@@ -46,9 +50,15 @@ class TraineeController extends Controller
                 'store' => $trainee->store->only(['id', 'name']),
                 'stats' => $stats[$trainee->id],
             ])->all(),
-            'stores' => $user->isSuperAdmin() ? Store::orderBy('name')->get(['id', 'name']) : [],
-            'filters' => ['store' => $storeId],
-            'canChooseStore' => $user->isSuperAdmin(),
+            'stores' => $canChooseStore
+                ? ($user->isSuperAdmin() ? Store::orderBy('name')->get(['id', 'name']) : $user->stores()->orderBy('stores.name')->get(['stores.id', 'stores.name']))
+                : [],
+            'filters' => ['store' => $storeId, 'tab' => $tab],
+            'canChooseStore' => $canChooseStore,
+            'traineeCounts' => [
+                'active' => (clone $visible)->active()->count(),
+                'archived' => (clone $visible)->archived()->count(),
+            ],
         ]);
     }
 
@@ -111,7 +121,7 @@ class TraineeController extends Controller
     {
         $this->authorize('view', $trainee);
 
-        $trainee->load('store', 'managers:id,name');
+        $trainee->load('store', 'managers:id,name', 'archivedBy:id,name');
         $isSuperAdmin = $request->user()->isSuperAdmin();
 
         return Inertia::render('training/trainees/show', [
@@ -122,8 +132,12 @@ class TraineeController extends Controller
                 'hired_at' => $trainee->hired_at?->toDateString(),
                 'store' => $trainee->store->only(['id', 'name']),
                 'managers' => $trainee->managers->map->only(['id', 'name'])->values(),
+                'archived_at' => $trainee->archived_at?->toIso8601String(),
+                'archived_by' => $trainee->archivedBy?->only(['id', 'name']),
             ],
             'progress' => $progress->detail($trainee),
+            'canManage' => $request->user()->can('update', $trainee),
+            'canDelete' => $request->user()->can('delete', $trainee),
             'canAssignManagers' => $isSuperAdmin,
             'availableManagers' => $isSuperAdmin
                 ? User::where('role', Role::Manager)
@@ -190,6 +204,40 @@ class TraineeController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Trainee removed.')]);
 
         return to_route('trainees.index');
+    }
+
+    /**
+     * Retire a trainee from the active roster. Nothing is deleted — their
+     * full evaluation history stays intact and reachable under the Archived
+     * tab (and in Reports, when "include archived" is checked).
+     */
+    public function archive(Request $request, Trainee $trainee): RedirectResponse
+    {
+        $this->authorize('update', $trainee);
+
+        $trainee->update([
+            'archived_at' => now(),
+            'archived_by' => $request->user()->id,
+        ]);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Trainee archived.')]);
+
+        return back();
+    }
+
+    /**
+     * Bring an archived trainee back onto the active roster — e.g. archived
+     * by mistake, or they return for refresher training.
+     */
+    public function restore(Trainee $trainee): RedirectResponse
+    {
+        $this->authorize('update', $trainee);
+
+        $trainee->update(['archived_at' => null, 'archived_by' => null]);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Trainee restored.')]);
+
+        return back();
     }
 
     /**
