@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Enums\Permission;
 use App\Models\Store;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -40,6 +41,22 @@ class ManagementPageTest extends TestCase
                 ->has('storeOptions')
                 ->has('roleOptions')
                 ->has('currentUserId')
+            );
+    }
+
+    public function test_management_page_lists_each_users_granted_permissions(): void
+    {
+        $admin = User::factory()->superAdmin()->create(['created_at' => now()->subDay()]);
+        User::factory()->manager()->withPermissions(Permission::ShareQuizLinks)->create();
+
+        $this->actingAs($admin)
+            ->get(route('admin.management'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('users.data.0.permissions', ['share_quiz_links'])
+                ->where('users.data.1.permissions', [])
+                ->where('permissionOptions.0.value', 'share_quiz_links')
+                ->has('permissionOptions.0.label')
+                ->has('permissionOptions.0.description')
             );
     }
 

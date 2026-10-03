@@ -4,14 +4,17 @@ import {
     // BookOpen,
     Building2,
     ClipboardList,
+    FileQuestion,
     // FolderGit2,
     LayoutGrid,
+    TrendingUp,
     Users,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
+import { StoreSwitcher } from '@/components/store-switcher';
 import {
     Sidebar,
     SidebarContent,
@@ -23,8 +26,10 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { management } from '@/routes/admin';
+import { index as developmentZoneIndex } from '@/routes/development-zone';
 import { index as reportsIndex } from '@/routes/reports';
 import { index as traineesIndex } from '@/routes/trainees';
+import { index as quizResultsIndex } from '@/routes/training/quiz-results';
 import { index as sectionsIndex } from '@/routes/training/sections';
 import type { Auth, NavItem } from '@/types';
 
@@ -45,6 +50,11 @@ export function AppSidebar() {
             icon: Users,
         },
         {
+            title: 'Development Zone',
+            href: developmentZoneIndex(),
+            icon: TrendingUp,
+        },
+        {
             title: 'Reports',
             href: reportsIndex(),
             icon: BarChart3,
@@ -63,6 +73,11 @@ export function AppSidebar() {
                 href: management(),
                 icon: Building2,
             },
+            {
+                title: 'Quiz Results',
+                href: quizResultsIndex(),
+                icon: FileQuestion,
+            },
         );
     }
 
@@ -77,6 +92,7 @@ export function AppSidebar() {
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
+                    <StoreSwitcher />
                 </SidebarMenu>
             </SidebarHeader>
 

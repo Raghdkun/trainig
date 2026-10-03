@@ -1,4 +1,5 @@
 import { Deferred } from '@inertiajs/react';
+import { QuizSummaryCard } from '@/components/reports/quiz-summary-card';
 import { RankingBar } from '@/components/reports/ranking-bar';
 import { ReportCard, ReportEmpty } from '@/components/reports/report-card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,7 +11,11 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import type { ImportanceRow, StationInsights } from '@/types/reports';
+import type {
+    ImportanceRow,
+    QuizResultsSummary,
+    StationInsights,
+} from '@/types/reports';
 
 function PanelSkeleton() {
     return (
@@ -48,11 +53,16 @@ function byWeakestScore<T extends { average_score: number | null }>(
 export function ContentPanel({
     insights,
     importance,
+    quiz,
 }: {
     insights?: StationInsights;
     importance?: ImportanceRow[];
+    quiz?: QuizResultsSummary;
 }) {
     const sections = [...(insights?.sections ?? [])].sort(byWeakestScore);
+    const categories = [...(insights?.categories ?? [])]
+        .sort(byWeakestScore)
+        .slice(0, 8);
     const problems = insights?.problem_items ?? [];
 
     return (
@@ -61,6 +71,8 @@ export function ContentPanel({
             fallback={<PanelSkeleton />}
         >
             <div className="space-y-4">
+                {quiz && <QuizSummaryCard summary={quiz} />}
+
                 <div className="grid gap-4 lg:grid-cols-2">
                     <ReportCard
                         title="Station scores"
@@ -102,6 +114,52 @@ export function ContentPanel({
                         )}
                     </ReportCard>
                 </div>
+
+                <ReportCard
+                    title="Weakest categories"
+                    description="Lowest-scoring categories across all stations"
+                >
+                    {categories.length === 0 ? (
+                        <ReportEmpty message="No category data yet." />
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Category</TableHead>
+                                        <TableHead>Station</TableHead>
+                                        <TableHead className="text-right">
+                                            Avg score
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            Completion
+                                        </TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {categories.map((category) => (
+                                        <TableRow key={category.id}>
+                                            <TableCell className="font-medium">
+                                                {category.title}
+                                            </TableCell>
+                                            <TableCell className="text-sm text-muted-foreground">
+                                                {category.section_title}
+                                            </TableCell>
+                                            <TableCell className="text-right font-semibold tabular-nums">
+                                                {category.average_score ?? '—'}
+                                                {category.average_score !==
+                                                    null && '%'}
+                                            </TableCell>
+                                            <TableCell className="text-right tabular-nums">
+                                                {category.completion}%
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+                </ReportCard>
 
                 <ReportCard
                     title="Problem items"

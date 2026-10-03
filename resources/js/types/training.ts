@@ -1,4 +1,7 @@
-export type Importance = 'optional' | 'moderately_important' | 'highly_important';
+export type Importance =
+    | 'optional'
+    | 'moderately_important'
+    | 'highly_important';
 
 export type MediaType = 'link' | 'file' | 'image' | 'video';
 
@@ -41,18 +44,57 @@ export type Category = {
     items?: ChecklistItem[];
 };
 
+export type SectionStatus = 'draft' | 'published';
+
 export type Section = {
     id: number;
     title: string;
     description: string | null;
     icon: string | null;
     order: number;
+    status: SectionStatus;
     pie_content_review: string | null;
     screen_to_shoulder: string | null;
     hands_on_shifts: string | null;
     categories?: Category[];
     categories_count?: number;
     checklist_items_count?: number;
+    quiz?: Quiz | null;
+};
+
+export type SectionStatusCounts = {
+    all: number;
+    draft: number;
+    published: number;
+};
+
+export type QuizQuestionOption = {
+    id: number;
+    text: string;
+    is_correct: boolean;
+    order: number;
+};
+
+export type QuizQuestionType = 'single' | 'multi';
+
+export type QuizQuestion = {
+    id: number;
+    prompt: string;
+    type: QuizQuestionType;
+    order: number;
+    options: QuizQuestionOption[];
+};
+
+/**
+ * The live version of a station's quiz, as authored in the Content Builder.
+ * Once `attempts_count` > 0 the version is frozen: edits create the next one.
+ */
+export type Quiz = {
+    id: number;
+    section_id: number;
+    version: number;
+    attempts_count: number;
+    questions: QuizQuestion[];
 };
 
 export type MoveTarget = {
@@ -68,6 +110,14 @@ export const IMPORTANCE_OPTIONS: { value: Importance; label: string }[] = [
 ];
 
 export type StoreOption = { id: number; name: string };
+
+/** An enabled trainee position, e.g. { value: 'Crew Member', label: 'CM – Crew Member' }. */
+export type PositionOption = { value: string; label: string };
+
+export type StoreSwitcherContext = {
+    canChoose: boolean;
+    options: StoreOption[];
+};
 
 export type TraineeStats = {
     completed: number;
@@ -90,6 +140,13 @@ export type TraineeDetail = {
     hired_at: string | null;
     store: StoreOption;
     managers: { id: number; name: string }[];
+    archived_at: string | null;
+    archived_by: { id: number; name: string } | null;
+};
+
+export type TraineeStatusCounts = {
+    active: number;
+    archived: number;
 };
 
 export type EvaluationState = {
@@ -121,6 +178,28 @@ export type ProgressCategory = {
     items: EvaluationItem[];
 };
 
+export type QuizAttemptStatus = 'not_started' | 'in_progress' | 'completed';
+
+/**
+ * A section's quiz status as seen from the trainee page — deliberately
+ * never carries a score or answers (see TraineeProgress::quizStatus). Safe
+ * for any manager who can view this trainee, not just admins.
+ */
+export type SectionQuiz = {
+    /** The live version's id — what "Send quiz" sends. */
+    id: number;
+    version: number;
+    questions_count: number;
+    /** The latest link was sent for an older version than the live one. */
+    is_outdated: boolean;
+    attempt: {
+        status: QuizAttemptStatus;
+        link: string | null;
+        flagged: boolean;
+        version: number;
+    } | null;
+};
+
 export type ProgressSection = {
     id: number;
     title: string;
@@ -131,6 +210,7 @@ export type ProgressSection = {
     hands_on_shifts: string | null;
     average_rating: number | null;
     categories: ProgressCategory[];
+    quiz: SectionQuiz | null;
 };
 
 export type TraineeProgressData = {
@@ -143,11 +223,22 @@ export type RoleValue = 'super_admin' | 'manager';
 
 export type RoleOption = { value: RoleValue; label: string };
 
+/** Mirrors App\Enums\Permission — abilities a super admin can grant a manager. */
+export type PermissionValue = 'share_quiz_links';
+
+export type PermissionOption = {
+    value: PermissionValue;
+    label: string;
+    description: string;
+};
+
 export type AdminUserRow = {
     id: number;
     name: string;
     email: string;
     role: RoleValue;
+    /** Explicitly granted permissions. Always empty for super admins, who hold them all. */
+    permissions: PermissionValue[];
     stores: StoreOption[];
     joined: string | null;
 };
@@ -172,4 +263,138 @@ export type ManagerStats = {
     trainees: number;
     completion: number;
     average_rating: number | null;
+};
+
+export type DevelopmentPickerItem = { id: number; title: string };
+
+export type DevelopmentPickerCategory = {
+    id: number;
+    title: string;
+    items: DevelopmentPickerItem[];
+};
+
+export type DevelopmentPickerSection = {
+    id: number;
+    title: string;
+    categories: DevelopmentPickerCategory[];
+};
+
+export type DevelopmentStats = { completed: number; total: number };
+
+export type DevelopmentPlanData = {
+    sections: ProgressSection[];
+    stats: DevelopmentStats;
+};
+
+export type DevelopmentStatus = 'pending' | 'active' | 'completed';
+
+export const DEVELOPMENT_STATUS_LABELS: Record<DevelopmentStatus, string> = {
+    pending: 'Pending',
+    active: 'Active',
+    completed: 'Completed',
+};
+
+export type DevelopmentCriterion = {
+    id: number;
+    label: string;
+    description: string | null;
+    order?: number;
+    is_active?: boolean;
+};
+
+export type DevelopmentEvaluationRatingInput = {
+    criterion_id: number;
+    rating: number;
+};
+
+export type DevelopmentEvaluationSummary = {
+    id: number;
+    evaluator: { id: number; name: string } | null;
+    notes: string | null;
+    submitted_at: string;
+    ratings: { criterion: DevelopmentCriterion; rating: number }[];
+} | null;
+
+export type DevelopmentZoneTrainee = {
+    id: number;
+    name: string;
+    position: string | null;
+    store: StoreOption;
+    status: DevelopmentStatus;
+    stats: DevelopmentStats;
+};
+
+export type AddableTrainee = {
+    id: number;
+    name: string;
+    position: string | null;
+    store: StoreOption;
+};
+
+export type DevelopmentZoneShowData = {
+    trainee: {
+        id: number;
+        name: string;
+        position: string | null;
+        store: StoreOption;
+        status: DevelopmentStatus;
+        archived_at: string | null;
+    };
+    evaluation: DevelopmentEvaluationSummary;
+    developmentPlan: DevelopmentPlanData;
+    developmentPicker: DevelopmentPickerSection[];
+    canManagePlan: boolean;
+    canComplete: boolean;
+    canRemove: boolean;
+};
+
+/** A row in the training-team-only Quiz Results list. */
+export type QuizAttemptRow = {
+    id: number;
+    trainee: { id: number; name: string };
+    store: StoreOption;
+    section: { id: number; title: string };
+    version: number;
+    status: QuizAttemptStatus;
+    flagged: boolean;
+    score: number | null;
+    /** The shareable link — only while the attempt is still open. */
+    link: string | null;
+    sent_at: string;
+    started_at: string | null;
+    completed_at: string | null;
+};
+
+/** One question's full breakdown for the Quiz Results detail page. */
+export type QuizResultOption = {
+    id: number;
+    text: string;
+    is_correct: boolean;
+    is_chosen: boolean;
+};
+
+export type QuizResultQuestion = {
+    id: number;
+    prompt: string;
+    type: QuizQuestionType;
+    /** Chosen set exactly matches the correct set (same rule as the score). */
+    is_correct: boolean;
+    options: QuizResultOption[];
+};
+
+export type QuizResultDetail = {
+    id: number;
+    trainee: { id: number; name: string };
+    store: StoreOption;
+    section: { id: number; title: string };
+    version: number;
+    status: QuizAttemptStatus;
+    flagged: boolean;
+    score: number | null;
+    correct_count: number | null;
+    questions_count: number;
+    link: string | null;
+    sent_at: string;
+    started_at: string | null;
+    completed_at: string | null;
 };

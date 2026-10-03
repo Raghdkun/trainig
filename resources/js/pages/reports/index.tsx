@@ -7,6 +7,8 @@ import { OverviewPanel } from '@/components/reports/overview-panel';
 import { StoresPanel } from '@/components/reports/stores-panel';
 import { TraineesPanel } from '@/components/reports/trainees-panel';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -15,12 +17,15 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { useStoreFilter, useSyncStoreFilter } from '@/hooks/use-store-filter';
 import { exportMethod, index } from '@/routes/reports';
 import type { BreadcrumbItem } from '@/types';
 import type {
+    DevelopmentZoneSummary,
     DistributionBand,
     ImportanceRow,
     ManagerActivityRow,
+    QuizResultsSummary,
     ReportArea,
     ReportFilters,
     ReportOverview,
@@ -40,11 +45,13 @@ type ReportPageProps = {
     overview: ReportOverview;
     trend?: TrendPoint[];
     distribution?: DistributionBand[];
+    developmentZone?: DevelopmentZoneSummary;
     storePerformance?: StorePerformanceRow[];
     managerActivity?: ManagerActivityRow[];
     traineeStatus?: TraineeStatusReport;
     stationInsights?: StationInsights;
     importanceBreakdown?: ImportanceRow[];
+    quizSummary?: QuizResultsSummary;
 };
 
 const AREAS: { value: ReportArea; label: string }[] = [
@@ -66,6 +73,9 @@ export default function ReportsIndex() {
     } = props;
 
     const [area, setArea] = useState<ReportArea>('overview');
+
+    const { setSelectedStoreId } = useStoreFilter();
+    useSyncStoreFilter(filters.store);
 
     const csvReportForArea: Record<ReportArea, string> = {
         overview: 'trainees',
@@ -89,13 +99,26 @@ export default function ReportsIndex() {
             params.set('weeks', String(filters.weeks));
         }
 
+        if (filters.includeArchived) {
+            params.set('includeArchived', '1');
+        }
+
         return `${exportMethod().url}?${params.toString()}`;
     }
 
-    function applyFilters(next: { store?: string; weeks?: string }) {
+    function applyFilters(next: {
+        store?: string;
+        weeks?: string;
+        includeArchived?: boolean;
+    }) {
         const store =
             next.store ?? (filters.store ? String(filters.store) : 'all');
         const weeks = next.weeks ?? String(filters.weeks);
+        const includeArchived = next.includeArchived ?? filters.includeArchived;
+
+        if (next.store !== undefined) {
+            setSelectedStoreId(store === 'all' ? null : Number(store));
+        }
 
         const params: Record<string, string> = {};
 
@@ -105,6 +128,10 @@ export default function ReportsIndex() {
 
         if (weeks !== String(weekOptions[0])) {
             params.weeks = weeks;
+        }
+
+        if (includeArchived) {
+            params.includeArchived = '1';
         }
 
         router.get(index().url, params, {
@@ -172,6 +199,17 @@ export default function ReportsIndex() {
                                 ))}
                             </SelectContent>
                         </Select>
+                        <Label className="flex items-center gap-2 text-sm font-normal text-muted-foreground">
+                            <Checkbox
+                                checked={filters.includeArchived}
+                                onCheckedChange={(checked) =>
+                                    applyFilters({
+                                        includeArchived: checked === true,
+                                    })
+                                }
+                            />
+                            Include archived
+                        </Label>
                         <Button variant="outline" size="icon" asChild>
                             <a
                                 href={exportHref('csv')}
@@ -216,6 +254,7 @@ export default function ReportsIndex() {
                         overview={overview}
                         trend={props.trend}
                         distribution={props.distribution}
+                        developmentZone={props.developmentZone}
                     />
                 )}
                 {area === 'stores' && (
@@ -232,6 +271,7 @@ export default function ReportsIndex() {
                     <ContentPanel
                         insights={props.stationInsights}
                         importance={props.importanceBreakdown}
+                        quiz={props.quizSummary}
                     />
                 )}
             </div>

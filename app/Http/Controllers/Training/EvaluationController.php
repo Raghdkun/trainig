@@ -23,6 +23,8 @@ class EvaluationController extends Controller
     ): RedirectResponse {
         $this->authorize('evaluate', $trainee);
 
+        abort_if($trainee->isArchived(), 403, 'This trainee is archived and read-only. Restore them to make changes.');
+
         $recordEvaluation->handle(
             $trainee,
             $checklistItem,

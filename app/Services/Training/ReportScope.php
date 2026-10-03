@@ -20,6 +20,7 @@ final class ReportScope
         public readonly array $traineeIds,
         public readonly ?int $storeId,
         public readonly int $weeks,
+        public readonly bool $includeArchived = false,
     ) {}
 
     public function isSuperAdmin(): bool

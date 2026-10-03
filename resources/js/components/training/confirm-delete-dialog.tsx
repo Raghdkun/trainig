@@ -21,12 +21,14 @@ export function ConfirmDeleteDialog({
     description,
     onConfirm,
     processing = false,
+    confirmLabel = 'Delete',
 }: {
     trigger: ReactNode;
     title: string;
     description: string;
     onConfirm: (close: () => void) => void;
     processing?: boolean;
+    confirmLabel?: string;
 }) {
     const [open, setOpen] = useState(false);
 
@@ -47,7 +49,7 @@ export function ConfirmDeleteDialog({
                         disabled={processing}
                         onClick={() => onConfirm(() => setOpen(false))}
                     >
-                        Delete
+                        {confirmLabel}
                     </Button>
                 </DialogFooter>
             </DialogContent>

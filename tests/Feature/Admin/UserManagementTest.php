@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Enums\Permission;
 use App\Enums\Role;
 use App\Models\Store;
 use App\Models\User;
@@ -117,5 +118,132 @@ class UserManagementTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertDatabaseMissing('users', ['id' => $other->id]);
+    }
+
+    // --- Permissions -------------------------------------------------------
+
+    public function test_managers_have_no_extra_permissions_by_default(): void
+    {
+        $manager = User::factory()->manager()->create();
+
+        $this->assertFalse($manager->hasPermission(Permission::ShareQuizLinks));
+    }
+
+    public function test_super_admins_hold_every_permission(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+
+        foreach (Permission::cases() as $permission) {
+            $this->assertTrue($admin->hasPermission($permission));
+        }
+    }
+
+    public function test_super_admin_can_create_a_manager_with_a_permission(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+        $store = Store::factory()->create();
+
+        $this->actingAs($admin)->post(route('admin.users.store'), [
+            'name' => 'Rafael Okafor',
+            'email' => 'rafael@example.com',
+            'password' => 'secret-pw-123',
+            'role' => 'manager',
+            'store_ids' => [$store->id],
+            'permissions' => ['share_quiz_links'],
+        ])->assertSessionHasNoErrors();
+
+        $this->assertTrue(User::firstWhere('email', 'rafael@example.com')->hasPermission(Permission::ShareQuizLinks));
+    }
+
+    public function test_super_admin_can_grant_and_revoke_a_managers_permission(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+        $store = Store::factory()->create();
+        $manager = User::factory()->manager($store)->create();
+
+        $this->actingAs($admin)->patch(route('admin.users.update', $manager), [
+            'role' => 'manager',
+            'store_ids' => [$store->id],
+            'permissions' => ['share_quiz_links'],
+        ])->assertSessionHasNoErrors();
+
+        $this->assertTrue($manager->refresh()->hasPermission(Permission::ShareQuizLinks));
+
+        $this->actingAs($admin)->patch(route('admin.users.update', $manager), [
+            'role' => 'manager',
+            'store_ids' => [$store->id],
+            'permissions' => [],
+        ])->assertSessionHasNoErrors();
+
+        $this->assertFalse($manager->refresh()->hasPermission(Permission::ShareQuizLinks));
+    }
+
+    public function test_changing_a_managers_stores_keeps_their_permissions(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+        [$storeA, $storeB] = Store::factory()->count(2)->create();
+        $manager = User::factory()->manager($storeA)->withPermissions(Permission::ShareQuizLinks)->create();
+
+        $this->actingAs($admin)->patch(route('admin.users.update', $manager), [
+            'role' => 'manager',
+            'store_ids' => [$storeA->id, $storeB->id],
+        ])->assertSessionHasNoErrors();
+
+        $this->assertTrue($manager->refresh()->hasPermission(Permission::ShareQuizLinks));
+    }
+
+    public function test_promoting_to_super_admin_clears_stored_permissions(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+        $manager = User::factory()->manager()->withPermissions(Permission::ShareQuizLinks)->create();
+
+        $this->actingAs($admin)->patch(route('admin.users.update', $manager), [
+            'role' => 'super_admin',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertNull($manager->refresh()->permissions);
+    }
+
+    public function test_demoting_a_super_admin_does_not_carry_permissions_over(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+        $otherAdmin = User::factory()->superAdmin()->create();
+        $store = Store::factory()->create();
+
+        $this->actingAs($admin)->patch(route('admin.users.update', $otherAdmin), [
+            'role' => 'manager',
+            'store_ids' => [$store->id],
+        ])->assertSessionHasNoErrors();
+
+        $this->assertFalse($otherAdmin->refresh()->hasPermission(Permission::ShareQuizLinks));
+    }
+
+    public function test_an_unknown_permission_is_rejected(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+        $store = Store::factory()->create();
+        $manager = User::factory()->manager($store)->create();
+
+        $this->actingAs($admin)->patch(route('admin.users.update', $manager), [
+            'role' => 'manager',
+            'store_ids' => [$store->id],
+            'permissions' => ['delete_everything'],
+        ])->assertSessionHasErrors('permissions.0');
+
+        $this->assertNull($manager->refresh()->permissions);
+    }
+
+    public function test_managers_cannot_grant_themselves_a_permission(): void
+    {
+        $store = Store::factory()->create();
+        $manager = User::factory()->manager($store)->create();
+
+        $this->actingAs($manager)->patch(route('admin.users.update', $manager), [
+            'role' => 'manager',
+            'store_ids' => [$store->id],
+            'permissions' => ['share_quiz_links'],
+        ])->assertForbidden();
+
+        $this->assertFalse($manager->refresh()->hasPermission(Permission::ShareQuizLinks));
     }
 }

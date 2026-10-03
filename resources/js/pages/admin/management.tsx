@@ -8,6 +8,7 @@ import type { Paginated } from '@/types/pagination';
 import type {
     AdminStoreRow,
     AdminUserRow,
+    PermissionOption,
     RoleOption,
     StoreOption,
 } from '@/types/training';
@@ -18,11 +19,18 @@ type ManagementProps = {
     stores: Paginated<AdminStoreRow>;
     storeOptions: StoreOption[];
     roleOptions: RoleOption[];
+    permissionOptions: PermissionOption[];
 };
 
 export default function Management() {
-    const { currentUserId, users, stores, storeOptions, roleOptions } =
-        usePage<ManagementProps>().props;
+    const {
+        currentUserId,
+        users,
+        stores,
+        storeOptions,
+        roleOptions,
+        permissionOptions,
+    } = usePage<ManagementProps>().props;
 
     return (
         <>
@@ -38,6 +46,7 @@ export default function Management() {
                     users={users}
                     stores={storeOptions}
                     roleOptions={roleOptions}
+                    permissionOptions={permissionOptions}
                     currentUserId={currentUserId}
                 />
 

@@ -3,6 +3,8 @@
 namespace App\Http\Middleware;
 
 use App\Enums\MediaType;
+use App\Models\Store;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -46,6 +48,27 @@ class HandleInertiaRequests extends Middleware
             // Upload constraints so the client can reject an oversized file
             // before sending a request the server may not survive.
             'mediaLimits' => MediaType::uploadLimits(),
+            // Drives the sidebar's store switcher, which stays in sync with
+            // whichever store filter is active on the current page.
+            'storeSwitcher' => $request->user() ? $this->storeSwitcherContext($request->user()) : null,
+        ];
+    }
+
+    /**
+     * @return array{canChoose: bool, options: array<int, array{id: int, name: string}>}
+     */
+    private function storeSwitcherContext(User $user): array
+    {
+        $stores = $user->isSuperAdmin()
+            ? Store::orderBy('name')->get(['id', 'name'])
+            : $user->stores()->orderBy('stores.name')->get(['stores.id', 'stores.name']);
+
+        return [
+            'canChoose' => $user->isSuperAdmin() || $stores->count() > 1,
+            'options' => $stores->map(fn (Store $store): array => [
+                'id' => $store->id,
+                'name' => $store->name,
+            ])->values()->all(),
         ];
     }
 }

@@ -3,10 +3,12 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\Permission;
 use App\Enums\Role;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\AsEnumCollection;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -22,6 +24,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string $name
  * @property string $email
  * @property Role $role
+ * @property \Illuminate\Support\Collection<int, Permission>|null $permissions
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property string|null $two_factor_secret
@@ -52,7 +55,21 @@ class User extends Authenticatable implements PasskeyUser
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
             'role' => Role::class,
+            'permissions' => AsEnumCollection::of(Permission::class),
         ];
+    }
+
+    /**
+     * Super admins hold every permission; anyone else only those a super
+     * admin explicitly granted them.
+     */
+    public function hasPermission(Permission $permission): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        return (bool) $this->permissions?->contains($permission);
     }
 
     /**
@@ -83,5 +100,34 @@ class User extends Authenticatable implements PasskeyUser
     public function isManager(): bool
     {
         return $this->role === Role::Manager;
+    }
+
+    /**
+     * Whether this user is allowed to switch between stores at all — super
+     * admins always can; a manager only needs it when assigned to more than
+     * one store (a single-store manager is already implicitly scoped).
+     */
+    public function canFilterByStore(): bool
+    {
+        return $this->isSuperAdmin() || $this->stores()->count() > 1;
+    }
+
+    /**
+     * Resolve a requested store id against what this user may actually filter
+     * by. Super admins may pick any store; a manager may only pick one of
+     * their own. Returns null (no filter / "all") when the request is empty
+     * or not permitted.
+     */
+    public function resolveStoreFilter(?int $requestedStoreId): ?int
+    {
+        if ($requestedStoreId === null) {
+            return null;
+        }
+
+        if ($this->isSuperAdmin()) {
+            return $requestedStoreId;
+        }
+
+        return $this->stores()->whereKey($requestedStoreId)->exists() ? $requestedStoreId : null;
     }
 }

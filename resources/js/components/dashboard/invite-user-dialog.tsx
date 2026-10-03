@@ -1,6 +1,7 @@
 import { useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
+import { PermissionChecklist } from '@/components/dashboard/permission-checklist';
 import { StoreMultiSelect } from '@/components/dashboard/store-multi-select';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -23,14 +24,22 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { store } from '@/routes/admin/users';
-import type { RoleOption, RoleValue, StoreOption } from '@/types/training';
+import type {
+    PermissionOption,
+    PermissionValue,
+    RoleOption,
+    RoleValue,
+    StoreOption,
+} from '@/types/training';
 
 export function InviteUserDialog({
     roleOptions,
+    permissionOptions,
     stores,
     trigger,
 }: {
     roleOptions: RoleOption[];
+    permissionOptions: PermissionOption[];
     stores: StoreOption[];
     trigger: ReactNode;
 }) {
@@ -41,6 +50,7 @@ export function InviteUserDialog({
         password: '',
         role: 'manager' as RoleValue,
         store_ids: [] as number[],
+        permissions: [] as PermissionValue[],
     });
 
     function submit(event: FormEvent) {
@@ -116,6 +126,7 @@ export function InviteUserDialog({
 
                                     if (value !== 'manager') {
                                         form.setData('store_ids', []);
+                                        form.setData('permissions', []);
                                     }
                                 }}
                             >
@@ -153,6 +164,26 @@ export function InviteUserDialog({
                             </div>
                         )}
                     </div>
+                    {form.data.role === 'manager' ? (
+                        <fieldset className="grid gap-2">
+                            <legend className="mb-2 text-sm font-medium">
+                                Permissions
+                            </legend>
+                            <PermissionChecklist
+                                idPrefix="new-user-permission"
+                                options={permissionOptions}
+                                value={form.data.permissions}
+                                onChange={(permissions) =>
+                                    form.setData('permissions', permissions)
+                                }
+                            />
+                            <InputError message={form.errors.permissions} />
+                        </fieldset>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">
+                            Super admins have every permission.
+                        </p>
+                    )}
                     <DialogFooter>
                         <Button type="submit" disabled={form.processing}>
                             Create account
