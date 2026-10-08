@@ -7,26 +7,31 @@ import {
     Store as StoreIcon,
     Users,
 } from 'lucide-react';
+import { DevelopmentZonePanel } from '@/components/dashboard/development-zone-panel';
 import { HeroTile } from '@/components/dashboard/hero-tile';
 import { StatCard } from '@/components/dashboard/stat-card';
 import { CompletionBar } from '@/components/training/completion-bar';
 import { RatingMeter } from '@/components/training/rating-meter';
 import { Button } from '@/components/ui/button';
+import { useSyncStoreFilter } from '@/hooks/use-store-filter';
 import { dashboard } from '@/routes';
 import { management } from '@/routes/admin';
 import { index as traineesIndex, show as traineeShow } from '@/routes/trainees';
 import type { Auth, BreadcrumbItem } from '@/types';
 import type {
     DashboardStats,
+    DevelopmentZoneTrainee,
     ManagerStats,
     TraineeSummary,
 } from '@/types/training';
 
 type DashboardProps = {
     isSuperAdmin: boolean;
+    filters: { store: number | null };
     stats?: DashboardStats;
     managerStats?: ManagerStats;
     trainees?: TraineeSummary[];
+    developmentZone: DevelopmentZoneTrainee[];
 };
 
 const GLASS_BUTTON =
@@ -35,6 +40,8 @@ const GLASS_BUTTON =
 export default function Dashboard() {
     const page = usePage<DashboardProps & { auth: Auth }>().props;
     const firstName = page.auth.user.name.split(' ')[0];
+
+    useSyncStoreFilter(page.filters.store);
 
     return (
         <>
@@ -53,6 +60,7 @@ export default function Dashboard() {
 
 function SuperAdminView({
     stats,
+    developmentZone,
     firstName,
 }: DashboardProps & { firstName: string }) {
     return (
@@ -68,8 +76,8 @@ function SuperAdminView({
                     action={
                         <Button asChild className={GLASS_BUTTON}>
                             <Link href={management().url}>
-                                <Building2 className="size-4" /> Manage team &amp;
-                                stores
+                                <Building2 className="size-4" /> Manage team
+                                &amp; stores
                             </Link>
                         </Button>
                     }
@@ -91,6 +99,8 @@ function SuperAdminView({
                     icon={ListChecks}
                 />
             </div>
+
+            <DevelopmentZonePanel trainees={developmentZone} />
         </div>
     );
 }
@@ -98,6 +108,7 @@ function SuperAdminView({
 function ManagerView({
     managerStats,
     trainees = [],
+    developmentZone,
     firstName,
 }: DashboardProps & { firstName: string }) {
     return (
@@ -188,6 +199,8 @@ function ManagerView({
                     )}
                 </div>
             </section>
+
+            <DevelopmentZonePanel trainees={developmentZone} />
         </div>
     );
 }

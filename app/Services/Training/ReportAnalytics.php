@@ -5,7 +5,10 @@ namespace App\Services\Training;
 use App\Enums\Importance;
 use App\Enums\Role;
 use App\Models\ChecklistItem;
+use App\Models\DevelopmentEvaluationRating;
+use App\Models\DevelopmentSkillScore;
 use App\Models\Evaluation;
+use App\Models\QuizAttempt;
 use App\Models\Section;
 use App\Models\Store;
 use App\Models\Trainee;
@@ -37,25 +40,44 @@ class ReportAnalytics
     /**
      * Resolve the reporting scope for a user + request filters.
      *
-     * @param  array{store?: int|null, weeks?: int|null}  $filters
+     * `stores` compares several stores together; the single `store` is still
+     * accepted (the sidebar switcher and older links use it).
+     *
+     * @param  array{stores?: array<int, int>, store?: int|null, weeks?: int|null, includeArchived?: bool}  $filters
      */
     public function for(User $user, array $filters = []): ReportScope
     {
-        $storeId = $user->isSuperAdmin() ? ($filters['store'] ?? null) : null;
+        $requestedStoreIds = ($filters['stores'] ?? []) !== []
+            ? $filters['stores']
+            : array_filter([$filters['store'] ?? null]);
+        $storeIds = $user->resolveStoreFilters($requestedStoreIds);
+        $includeArchived = (bool) ($filters['includeArchived'] ?? false);
 
         $weeks = (int) ($filters['weeks'] ?? self::WEEK_OPTIONS[0]);
         if (! in_array($weeks, self::WEEK_OPTIONS, true)) {
             $weeks = self::WEEK_OPTIONS[0];
         }
 
-        $traineeIds = Trainee::query()
+        $visible = Trainee::query()
             ->visibleTo($user)
-            ->inStore($storeId)
+            ->inStore($storeIds)
+            ->when(! $includeArchived, fn ($query) => $query->active());
+
+        $traineeIds = (clone $visible)
+            ->onRoster()
             ->pluck('id')
             ->map(fn ($id): int => (int) $id)
             ->all();
 
-        return new ReportScope($user, $traineeIds, $storeId, $weeks);
+        // The Development Zone card also counts employees added straight into
+        // the zone, who are otherwise kept out of roster reporting.
+        $developmentTraineeIds = (clone $visible)
+            ->inDevelopmentZone()
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        return new ReportScope($user, $traineeIds, $storeIds, $weeks, $includeArchived, $developmentTraineeIds);
     }
 
     /**
@@ -224,8 +246,8 @@ class ReportAnalytics
             ->where('role', Role::Manager)
             ->when(! $scope->isSuperAdmin(), fn ($query) => $query->whereKey($scope->user->id))
             ->when(
-                $scope->isSuperAdmin() && $scope->storeId,
-                fn ($query) => $query->whereHas('stores', fn ($inner) => $inner->whereKey($scope->storeId)),
+                $scope->isSuperAdmin() && $scope->hasStoreFilter(),
+                fn ($query) => $query->whereHas('stores', fn ($inner) => $inner->whereIn('stores.id', $scope->storeIds)),
             )
             ->with('stores:id,name')
             ->orderBy('name')
@@ -307,8 +329,11 @@ class ReportAnalytics
         $traineeCount = count($scope->traineeIds);
         $leafIds = $this->progress->leafItemIds();
 
+        // Derived from the already-published-filtered $leafIds (rather than a
+        // fresh whereDoesntHave query) so this denominator can never count a
+        // draft station's items that groupedCompleted's numerator excludes.
         $leafByCategory = ChecklistItem::query()
-            ->whereDoesntHave('children')
+            ->whereIn('id', $leafIds)
             ->selectRaw('category_id, count(*) as total')
             ->groupBy('category_id')
             ->pluck('total', 'category_id');
@@ -318,7 +343,7 @@ class ReportAnalytics
         $doneByCategory = $this->groupedCompleted($scope, 'checklist_items.category_id', $leafIds);
         $doneBySection = $this->groupedCompleted($scope, 'categories.section_id', $leafIds, joinCategories: true);
 
-        $sections = Section::query()->ordered()->with('categories:id,section_id,title,order')->get();
+        $sections = Section::query()->ordered()->published()->with('categories:id,section_id,title,order')->get();
 
         $sectionRows = [];
         $categoryRows = [];
@@ -374,8 +399,10 @@ class ReportAnalytics
         $traineeCount = count($scope->traineeIds);
         $leafIds = $this->progress->leafItemIds();
 
+        // See stationInsights()'s $leafByCategory for why this reuses $leafIds
+        // instead of an independent whereDoesntHave query.
         $leafByImportance = ChecklistItem::query()
-            ->whereDoesntHave('children')
+            ->whereIn('id', $leafIds)
             ->selectRaw('importance, count(*) as total')
             ->groupBy('importance')
             ->pluck('total', 'importance');
@@ -409,6 +436,87 @@ class ReportAnalytics
                 'evaluations' => $stats !== null ? (int) $stats->total : 0,
             ];
         }, $keys);
+    }
+
+    /**
+     * Where trainees in scope stand in the Development Zone pipeline, plus
+     * the average manager evaluation rating and completion within everyone's
+     * curated development plan.
+     *
+     * @return array{pending: int, active: int, completed: int, in_zone: int, average_evaluation_rating: float|null, plan_completion: int}
+     */
+    public function developmentZone(ReportScope $scope): array
+    {
+        $empty = [
+            'pending' => 0,
+            'active' => 0,
+            'completed' => 0,
+            'in_zone' => 0,
+            'average_evaluation_rating' => null,
+            'plan_completion' => 0,
+        ];
+
+        if ($scope->developmentTraineeIds === []) {
+            return $empty;
+        }
+
+        $trainees = Trainee::query()
+            ->whereIn('id', $scope->developmentTraineeIds)
+            ->get(['id', 'development_status']);
+
+        $counts = ['pending' => 0, 'active' => 0, 'completed' => 0];
+        foreach ($trainees as $trainee) {
+            if ($trainee->development_status !== null) {
+                $counts[$trainee->development_status->value]++;
+            }
+        }
+
+        $inZoneIds = $trainees->whereNotNull('development_status')->pluck('id');
+
+        // Station assessment stars (0–5); evaluations from before the station
+        // assessment only have criterion ratings, which are on the same scale.
+        $averageRating = DevelopmentSkillScore::query()
+            ->whereHas('evaluation', fn ($query) => $query->whereIn('trainee_id', $scope->developmentTraineeIds))
+            ->avg('stars')
+            ?? DevelopmentEvaluationRating::query()
+                ->whereHas('evaluation', fn ($query) => $query->whereIn('trainee_id', $scope->developmentTraineeIds))
+                ->avg('rating');
+
+        $planStats = $this->progress->developmentStats($inZoneIds);
+        $planCompleted = array_sum(array_column($planStats, 'completed'));
+        $planTotal = array_sum(array_column($planStats, 'total'));
+
+        return [
+            'pending' => $counts['pending'],
+            'active' => $counts['active'],
+            'completed' => $counts['completed'],
+            'in_zone' => $inZoneIds->count(),
+            'average_evaluation_rating' => $averageRating === null ? null : round((float) $averageRating, 1),
+            'plan_completion' => $planTotal > 0 ? (int) round($planCompleted / $planTotal * 100) : 0,
+        ];
+    }
+
+    /**
+     * Quiz activity across the scope — admin-only data, mirroring the Quiz
+     * Results page's own access rule.
+     *
+     * @return array{sent: int, completed: int, average_score: float|null}
+     */
+    public function quizSummary(ReportScope $scope): array
+    {
+        if ($scope->isEmpty()) {
+            return ['sent' => 0, 'completed' => 0, 'average_score' => null];
+        }
+
+        $sent = QuizAttempt::query()->whereIn('trainee_id', $scope->traineeIds)->count();
+        $completed = QuizAttempt::query()->whereIn('trainee_id', $scope->traineeIds)->whereNotNull('completed_at');
+        $averageScore = (clone $completed)->avg('score');
+
+        return [
+            'sent' => $sent,
+            'completed' => $completed->count(),
+            'average_score' => $averageScore === null ? null : round((float) $averageScore, 1),
+        ];
     }
 
     /**

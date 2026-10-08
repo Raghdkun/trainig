@@ -103,7 +103,9 @@ export function VideoPlayer({
         if (document.fullscreenElement) {
             void document.exitFullscreen();
         } else {
-            void containerRef.current?.requestFullscreen().catch(() => undefined);
+            void containerRef.current
+                ?.requestFullscreen()
+                .catch(() => undefined);
         }
     }, []);
 
@@ -153,7 +155,10 @@ export function VideoPlayer({
         document.addEventListener('fullscreenchange', onFullscreenChange);
 
         return () =>
-            document.removeEventListener('fullscreenchange', onFullscreenChange);
+            document.removeEventListener(
+                'fullscreenchange',
+                onFullscreenChange,
+            );
     }, []);
 
     function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
@@ -199,7 +204,9 @@ export function VideoPlayer({
                     className,
                 )}
             >
-                <p className="text-sm font-medium">This video can’t be played</p>
+                <p className="text-sm font-medium">
+                    This video can’t be played
+                </p>
                 <p className="text-xs text-muted-foreground">
                     The file may be missing or in an unsupported format.
                 </p>
@@ -245,7 +252,9 @@ export function VideoPlayer({
                     const video = e.currentTarget;
 
                     if (video.buffered.length > 0) {
-                        setBuffered(video.buffered.end(video.buffered.length - 1));
+                        setBuffered(
+                            video.buffered.end(video.buffered.length - 1),
+                        );
                     }
                 }}
                 onPlay={() => {
@@ -290,7 +299,10 @@ export function VideoPlayer({
                         {ended ? (
                             <RotateCcw className="size-6" />
                         ) : (
-                            <Play className="size-6 translate-x-0.5" fill="currentColor" />
+                            <Play
+                                className="size-6 translate-x-0.5"
+                                fill="currentColor"
+                            />
                         )}
                     </span>
                 </button>
@@ -372,7 +384,9 @@ export function VideoPlayer({
                             max={1}
                             step={0.05}
                             value={muted ? 0 : volume}
-                            onChange={(e) => changeVolume(Number(e.target.value))}
+                            onChange={(e) =>
+                                changeVolume(Number(e.target.value))
+                            }
                             aria-label="Volume"
                             className="hidden h-1 w-16 cursor-pointer appearance-none rounded-full bg-white/30 sm:block [&::-webkit-slider-thumb]:size-2.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
                         />

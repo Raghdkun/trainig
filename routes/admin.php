@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\DevelopmentEvaluationCriterionController;
 use App\Http\Controllers\Admin\ManagementController;
 use App\Http\Controllers\Admin\StoreController;
 use App\Http\Controllers\Admin\UserController;
@@ -21,4 +22,8 @@ Route::middleware(['auth', 'verified', 'super_admin'])
         Route::post('stores', [StoreController::class, 'store'])->name('stores.store');
         Route::put('stores/{store}', [StoreController::class, 'update'])->name('stores.update');
         Route::delete('stores/{store}', [StoreController::class, 'destroy'])->name('stores.destroy');
+
+        Route::post('development-criteria', [DevelopmentEvaluationCriterionController::class, 'store'])->name('development-criteria.store');
+        Route::patch('development-criteria/{criterion}', [DevelopmentEvaluationCriterionController::class, 'update'])->name('development-criteria.update');
+        Route::delete('development-criteria/{criterion}', [DevelopmentEvaluationCriterionController::class, 'destroy'])->name('development-criteria.destroy');
     });

@@ -8,6 +8,7 @@ use App\Services\Training\ReportAnalytics;
 use App\Services\Training\ReportScope;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -26,28 +27,35 @@ class ReportController extends Controller
     public function index(Request $request): Response
     {
         $user = $request->user();
-        $scope = $this->analytics->for($user, [
-            'store' => $request->integer('store') ?: null,
-            'weeks' => $request->integer('weeks') ?: null,
-        ]);
+        $scope = $this->analytics->for($user, $this->filters($request));
 
-        return Inertia::render('reports/index', [
+        $props = [
             'isSuperAdmin' => $user->isSuperAdmin(),
-            'canChooseStore' => $user->isSuperAdmin(),
-            'storeOptions' => $user->isSuperAdmin()
-                ? Store::orderBy('name')->get(['id', 'name'])
+            'canChooseStore' => $user->canFilterByStore(),
+            'storeOptions' => $user->canFilterByStore()
+                ? ($user->isSuperAdmin() ? Store::orderBy('name')->get(['id', 'name']) : $user->stores()->orderBy('stores.name')->get(['stores.id', 'stores.name']))
                 : [],
             'weekOptions' => ReportAnalytics::WEEK_OPTIONS,
-            'filters' => ['store' => $scope->storeId, 'weeks' => $scope->weeks],
+            'filters' => ['stores' => $scope->storeIds, 'weeks' => $scope->weeks, 'includeArchived' => $scope->includeArchived],
             'overview' => $this->analytics->overview($scope),
             'trend' => Inertia::defer(fn () => $this->analytics->completionTrend($scope), 'reports'),
             'distribution' => Inertia::defer(fn () => $this->analytics->scoreDistribution($scope), 'reports'),
+            'developmentZone' => Inertia::defer(fn () => $this->analytics->developmentZone($scope), 'reports'),
             'storePerformance' => Inertia::defer(fn () => $this->analytics->storePerformance($scope), 'reports'),
             'managerActivity' => Inertia::defer(fn () => $this->analytics->managerActivity($scope), 'reports'),
             'traineeStatus' => Inertia::defer(fn () => $this->analytics->traineeStatus($scope), 'reports'),
             'stationInsights' => Inertia::defer(fn () => $this->analytics->stationInsights($scope), 'reports'),
             'importanceBreakdown' => Inertia::defer(fn () => $this->analytics->importanceBreakdown($scope), 'reports'),
-        ]);
+        ];
+
+        // Quiz results are training-team-only everywhere else in the app
+        // (see routes/training.php's quiz-results group) — keep that rule
+        // here too, rather than exposing manager-visible quiz data.
+        if ($user->isSuperAdmin()) {
+            $props['quizSummary'] = Inertia::defer(fn () => $this->analytics->quizSummary($scope), 'reports');
+        }
+
+        return Inertia::render('reports/index', $props);
     }
 
     /**
@@ -60,19 +68,42 @@ class ReportController extends Controller
             'format' => ['nullable', Rule::in(['csv', 'pdf'])],
             'report' => ['nullable', Rule::in(['trainees', 'stores', 'managers', 'stations'])],
             'store' => ['nullable', 'integer', 'exists:stores,id'],
+            'stores' => ['nullable', 'array'],
+            'stores.*' => ['integer', 'exists:stores,id'],
             'weeks' => ['nullable', 'integer'],
+            'includeArchived' => ['nullable', 'boolean'],
         ]);
 
-        $scope = $this->analytics->for($request->user(), [
-            'store' => $request->integer('store') ?: null,
-            'weeks' => $request->integer('weeks') ?: null,
-        ]);
+        $scope = $this->analytics->for($request->user(), $this->filters($request));
 
         if ($request->string('format')->toString() === 'pdf') {
             return $this->pdf($scope);
         }
 
         return $this->csv($scope, $request->string('report')->toString() ?: 'trainees');
+    }
+
+    /**
+     * The report filters from the query string. `stores[]` selects a group of
+     * stores to compare together; a lone `store` (sidebar switcher, older
+     * links) is still honoured.
+     *
+     * @return array{stores: array<int, int>, store: int|null, weeks: int|null, includeArchived: bool}
+     */
+    private function filters(Request $request): array
+    {
+        $stores = collect(Arr::wrap($request->query('stores', [])))
+            ->filter(fn ($id): bool => is_numeric($id))
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+
+        return [
+            'stores' => $stores,
+            'store' => $request->integer('store') ?: null,
+            'weeks' => $request->integer('weeks') ?: null,
+            'includeArchived' => $request->boolean('includeArchived'),
+        ];
     }
 
     /**

@@ -1,0 +1,33 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        // Safe to run again if an earlier attempt stopped after adding it.
+        if (Schema::hasColumn('quiz_attempts', 'wrong_recipient_reported_at')) {
+            return;
+        }
+
+        Schema::table('quiz_attempts', function (Blueprint $table): void {
+            $table->timestamp('wrong_recipient_reported_at')->nullable()->after('score');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('quiz_attempts', function (Blueprint $table): void {
+            $table->dropColumn('wrong_recipient_reported_at');
+        });
+    }
+};

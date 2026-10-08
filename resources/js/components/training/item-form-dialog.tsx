@@ -177,12 +177,10 @@ export function ItemFormDialog({
                                 Requires a score
                             </Label>
                             <p className="text-xs text-muted-foreground">
-                                When off, the manager just checks this step
-                                done — no score or note needed.
+                                When off, the manager just checks this step done
+                                — no score or note needed.
                             </p>
-                            <InputError
-                                message={form.errors.requires_rating}
-                            />
+                            <InputError message={form.errors.requires_rating} />
                         </div>
                     </div>
 

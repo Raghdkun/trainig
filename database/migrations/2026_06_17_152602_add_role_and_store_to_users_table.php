@@ -25,6 +25,8 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             $table->dropConstrainedForeignId('store_id');
+            // SQLite refuses to drop a column that still has an index on it.
+            $table->dropIndex(['role']);
             $table->dropColumn('role');
         });
     }

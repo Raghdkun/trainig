@@ -48,7 +48,9 @@ export function ChecklistItemRow({
                 {!isSub && selection && (
                     <Checkbox
                         checked={selection.isSelected('item', item.id)}
-                        onCheckedChange={() => selection.toggle('item', item.id)}
+                        onCheckedChange={() =>
+                            selection.toggle('item', item.id)
+                        }
                         onClick={(e) => e.stopPropagation()}
                         aria-label={`Select ${item.title}`}
                         className="mt-0.5 shrink-0"

@@ -42,12 +42,14 @@ export function CategorySection({
     category,
     traineeId,
     currentStepId,
+    readOnly = false,
     open,
     onOpenChange,
 }: {
     category: ProgressCategory;
     traineeId: number;
     currentStepId: number | null;
+    readOnly?: boolean;
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
@@ -101,6 +103,7 @@ export function CategorySection({
                         item={item}
                         traineeId={traineeId}
                         currentStepId={currentStepId}
+                        readOnly={readOnly}
                     />
                 ))}
             </CollapsibleContent>

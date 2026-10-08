@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\Permission;
 use App\Enums\Role;
 use App\Models\Store;
 use App\Models\User;
@@ -60,6 +61,16 @@ class UserFactory extends Factory
         ])->afterCreating(function (User $user) use ($store): void {
             $user->stores()->attach($store ? $store->id : Store::factory()->create()->id);
         });
+    }
+
+    /**
+     * Grant the user extra permissions (only meaningful for managers).
+     */
+    public function withPermissions(Permission ...$permissions): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'permissions' => $permissions,
+        ]);
     }
 
     /**

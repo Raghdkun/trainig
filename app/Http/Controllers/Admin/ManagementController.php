@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\Permission;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Models\Store;
@@ -26,6 +27,7 @@ class ManagementController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role->value,
+                'permissions' => $user->permissions?->map(fn (Permission $permission): string => $permission->value)->values() ?? [],
                 'stores' => $user->stores->map(fn (Store $store): array => [
                     'id' => $store->id,
                     'name' => $store->name,
@@ -55,6 +57,7 @@ class ManagementController extends Controller
                 'value' => $role->value,
                 'label' => $role->label(),
             ]),
+            'permissionOptions' => Permission::options(),
         ]);
     }
 }
