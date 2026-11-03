@@ -109,6 +109,7 @@ class ReportAnalytics
             'not_started' => $counts['not_started'],
             'evaluations_recorded' => $scope->isEmpty() ? 0 : Evaluation::query()
                 ->whereIn('trainee_id', $scope->traineeIds)
+                ->whereNotIn('checklist_item_id', $this->progress->uncountedItemIds())
                 ->count(),
         ];
     }
@@ -167,6 +168,7 @@ class ReportAnalytics
             $ratings = Evaluation::query()
                 ->whereIn('trainee_id', $scope->traineeIds)
                 ->whereNotNull('rating')
+                ->whereNotIn('checklist_item_id', $this->progress->uncountedItemIds())
                 ->pluck('rating');
 
             foreach ($ratings as $rating) {
@@ -205,6 +207,7 @@ class ReportAnalytics
             ->join('trainees', 'trainees.id', '=', 'evaluations.trainee_id')
             ->whereIn('evaluations.trainee_id', $scope->traineeIds)
             ->whereNotNull('rating')
+            ->whereNotIn('evaluations.checklist_item_id', $this->progress->uncountedItemIds())
             ->groupBy('trainees.store_id')
             ->selectRaw('trainees.store_id as store_id, avg(rating) as average')
             ->pluck('average', 'store_id');
@@ -261,6 +264,7 @@ class ReportAnalytics
 
         $recorded = $scope->isEmpty() ? [] : DB::table('evaluations')
             ->whereIn('trainee_id', $scope->traineeIds)
+            ->whereNotIn('checklist_item_id', $this->progress->uncountedItemIds())
             ->whereNotNull('evaluated_by')
             ->groupBy('evaluated_by')
             ->selectRaw('evaluated_by, count(*) as total, avg(rating) as average')
@@ -343,7 +347,7 @@ class ReportAnalytics
         $doneByCategory = $this->groupedCompleted($scope, 'checklist_items.category_id', $leafIds);
         $doneBySection = $this->groupedCompleted($scope, 'categories.section_id', $leafIds, joinCategories: true);
 
-        $sections = Section::query()->ordered()->published()->with('categories:id,section_id,title,order')->get();
+        $sections = Section::query()->ordered()->published()->counted()->with('categories:id,section_id,title,order')->get();
 
         $sectionRows = [];
         $categoryRows = [];
@@ -411,6 +415,7 @@ class ReportAnalytics
             ->join('checklist_items', 'checklist_items.id', '=', 'evaluations.checklist_item_id')
             ->whereIn('evaluations.trainee_id', $scope->traineeIds)
             ->whereNotNull('rating')
+            ->whereNotIn('evaluations.checklist_item_id', $this->progress->uncountedItemIds())
             ->groupBy('checklist_items.importance')
             ->selectRaw('checklist_items.importance as importance, avg(rating) as average, count(*) as total')
             ->get()
@@ -531,6 +536,7 @@ class ReportAnalytics
         $average = Evaluation::query()
             ->whereIn('trainee_id', $scope->traineeIds)
             ->whereNotNull('rating')
+            ->whereNotIn('checklist_item_id', $this->progress->uncountedItemIds())
             ->avg('rating');
 
         return $average === null ? null : round((float) $average, 1);
@@ -603,6 +609,7 @@ class ReportAnalytics
             ->when($joinCategories, fn ($query) => $query->join('categories', 'categories.id', '=', 'checklist_items.category_id'))
             ->whereIn('evaluations.trainee_id', $scope->traineeIds)
             ->whereNotNull('rating')
+            ->whereNotIn('evaluations.checklist_item_id', $this->progress->uncountedItemIds())
             ->groupBy($groupBy)
             ->selectRaw("{$groupBy} as bucket, avg(rating) as average")
             ->pluck('average', 'bucket');
@@ -653,6 +660,7 @@ class ReportAnalytics
 
         $lastActivity = Evaluation::query()
             ->whereIn('trainee_id', $scope->traineeIds)
+            ->whereNotIn('checklist_item_id', $this->progress->uncountedItemIds())
             ->whereNotNull('completed_at')
             ->groupBy('trainee_id')
             ->selectRaw('trainee_id, max(completed_at) as last')

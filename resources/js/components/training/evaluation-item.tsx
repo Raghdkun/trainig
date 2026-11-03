@@ -3,6 +3,7 @@ import { Lock } from 'lucide-react';
 import { useState } from 'react';
 import { ImportanceBadge } from '@/components/training/importance-badge';
 import { MediaAttachments } from '@/components/training/media-attachments';
+import { OptionalBadge } from '@/components/training/optional-badge';
 import { RatingInput } from '@/components/training/rating-input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
@@ -85,6 +86,7 @@ function EvaluationParent({
             <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold">{item.title}</span>
                 <ImportanceBadge importance={item.importance} />
+                {!item.counts_toward_progress && <OptionalBadge />}
                 {completed && (
                     <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
                         Complete
@@ -234,6 +236,7 @@ function EvaluationLeaf({
                             {item.title}
                         </span>
                         <ImportanceBadge importance={item.importance} />
+                        {!item.counts_toward_progress && <OptionalBadge />}
                         {isCurrent && (
                             <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
                                 Current step

@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useStoreFilter, useSyncStoreFilter } from '@/hooks/use-store-filter';
+import { formatHireDate } from '@/lib/format-hire-date';
 import { create, index, show } from '@/routes/trainees';
 import type { BreadcrumbItem } from '@/types';
 import type {
@@ -170,10 +171,27 @@ export default function TraineesIndex() {
                                                     canChooseStore
                                                         ? trainee.store.name
                                                         : null,
+                                                    trainee.hired_at
+                                                        ? `Hired ${formatHireDate(trainee.hired_at)}`
+                                                        : null,
                                                 ]
                                                     .filter(Boolean)
                                                     .join(' · ') || '—'}
                                             </p>
+                                            {filters.tab === 'archived' &&
+                                                trainee.archive_reason && (
+                                                    <p
+                                                        className="mt-0.5 truncate text-xs text-muted-foreground"
+                                                        title={
+                                                            trainee.archive_reason
+                                                        }
+                                                    >
+                                                        <span className="font-medium">
+                                                            Reason:
+                                                        </span>{' '}
+                                                        {trainee.archive_reason}
+                                                    </p>
+                                                )}
                                         </div>
                                         <div className="flex items-center gap-3 sm:w-auto">
                                             <div className="w-full sm:w-44">

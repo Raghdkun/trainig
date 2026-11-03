@@ -7,6 +7,7 @@ import type { SelectionKind } from '@/components/training/builder-selection';
 import { BulkActionBar } from '@/components/training/bulk-action-bar';
 import { CategoryBlock } from '@/components/training/category-block';
 import { CategoryFormDialog } from '@/components/training/category-form-dialog';
+import { OptionalBadge } from '@/components/training/optional-badge';
 import { QuizManager } from '@/components/training/quiz-manager';
 import { SectionFormDialog } from '@/components/training/section-form-dialog';
 import { SectionStatusBadge } from '@/components/training/section-status-badge';
@@ -96,6 +97,9 @@ export default function BuilderSection() {
                         />
                         <div className="flex flex-wrap gap-1.5">
                             <SectionStatusBadge status={section.status} />
+                            {!section.counts_toward_progress && (
+                                <OptionalBadge />
+                            )}
                             {timing.map((label) => (
                                 <Badge key={label} variant="outline">
                                     {label}

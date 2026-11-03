@@ -100,6 +100,7 @@ class TraineeArchiveRequestController extends Controller
                 $archiveRequest->trainee->update([
                     'archived_at' => now(),
                     'archived_by' => $request->user()->id,
+                    'archive_reason' => $archiveRequest->reason,
                 ]);
             }
         });

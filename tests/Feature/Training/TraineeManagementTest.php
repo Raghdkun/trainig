@@ -145,6 +145,55 @@ class TraineeManagementTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_manager_cannot_delete_even_their_own_active_trainee(): void
+    {
+        $this->withoutVite();
+        $store = Store::factory()->create();
+        $manager = User::factory()->manager($store)->create();
+        $admin = User::factory()->superAdmin()->create();
+        $trainee = Trainee::factory()->forStore($store)->create();
+        $trainee->managers()->attach($manager);
+
+        $this->actingAs($manager)
+            ->get(route('trainees.show', $trainee))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('canManage', true)
+                ->where('canDelete', false)
+            );
+
+        $this->actingAs($manager)
+            ->delete(route('trainees.destroy', $trainee))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('trainees', ['id' => $trainee->id]);
+
+        $this->actingAs($admin)
+            ->get(route('trainees.show', $trainee))
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('canDelete', true));
+    }
+
+    public function test_trainees_list_includes_each_hire_date(): void
+    {
+        $this->withoutVite();
+        $admin = User::factory()->superAdmin()->create();
+        Trainee::factory()->create(['hired_at' => '2026-09-15']);
+
+        $this->actingAs($admin)
+            ->get(route('trainees.index'))
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('trainees.0.hired_at', '2026-09-15'));
+    }
+
+    public function test_trainee_page_includes_the_hire_date(): void
+    {
+        $this->withoutVite();
+        $admin = User::factory()->superAdmin()->create();
+        $trainee = Trainee::factory()->create(['hired_at' => '2026-09-15']);
+
+        $this->actingAs($admin)
+            ->get(route('trainees.show', $trainee))
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('trainee.hired_at', '2026-09-15'));
+    }
+
     public function test_only_super_admin_can_assign_managers(): void
     {
         $store = Store::factory()->create();

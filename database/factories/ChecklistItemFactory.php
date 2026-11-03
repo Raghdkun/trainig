@@ -39,6 +39,16 @@ class ChecklistItemFactory extends Factory
     }
 
     /**
+     * An optional item — left out of completion, score and reports.
+     */
+    public function uncounted(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'counts_toward_progress' => false,
+        ]);
+    }
+
+    /**
      * Make this item a sub-item of the given parent.
      */
     public function child(ChecklistItem $parent): static

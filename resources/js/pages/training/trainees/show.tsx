@@ -18,6 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { formatHireDate } from '@/lib/format-hire-date';
 import {
     archive,
     destroy,
@@ -90,6 +91,12 @@ export default function TraineeShow() {
                                 : ''}
                         </AlertTitle>
                         <AlertDescription>
+                            {trainee.archive_reason && (
+                                <p className="break-words whitespace-pre-line text-foreground">
+                                    <span className="font-medium">Reason:</span>{' '}
+                                    {trainee.archive_reason}
+                                </p>
+                            )}
                             <p>
                                 This trainee is read-only.{' '}
                                 {canManage
@@ -173,7 +180,13 @@ export default function TraineeShow() {
                                 {trainee.name}
                             </h1>
                             <p className="text-sm text-muted-foreground">
-                                {[trainee.position, trainee.store.name]
+                                {[
+                                    trainee.position,
+                                    trainee.store.name,
+                                    trainee.hired_at
+                                        ? `Hired ${formatHireDate(trainee.hired_at)}`
+                                        : null,
+                                ]
                                     .filter(Boolean)
                                     .join(' · ')}
                             </p>

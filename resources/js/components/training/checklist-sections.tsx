@@ -1,6 +1,7 @@
 import { ChevronDown, Clock } from 'lucide-react';
 import { useState } from 'react';
 import { CategorySection } from '@/components/training/category-section';
+import { OptionalBadge } from '@/components/training/optional-badge';
 import { RatingMeter } from '@/components/training/rating-meter';
 import { SectionQuizCard } from '@/components/training/section-quiz-card';
 import { Badge } from '@/components/ui/badge';
@@ -10,34 +11,11 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { leafCount } from '@/lib/leaf-count';
 import type {
     EvaluationItem as EvaluationItemType,
     ProgressSection,
 } from '@/types/training';
-
-function leafCount(items: EvaluationItemType[]): {
-    done: number;
-    total: number;
-} {
-    return items.reduce(
-        (acc, item) => {
-            if (item.children.length > 0) {
-                const child = leafCount(item.children);
-
-                return {
-                    done: acc.done + child.done,
-                    total: acc.total + child.total,
-                };
-            }
-
-            return {
-                done: acc.done + (item.evaluation?.completed ? 1 : 0),
-                total: acc.total + 1,
-            };
-        },
-        { done: 0, total: 0 },
-    );
-}
 
 function itemsContain(items: EvaluationItemType[], stepId: number): boolean {
     return items.some(
@@ -120,6 +98,7 @@ export function ChecklistSections({
             {sections.map((section) => {
                 const count = leafCount(
                     section.categories.flatMap((c) => c.items),
+                    !section.counts_toward_progress,
                 );
 
                 return (
@@ -133,8 +112,13 @@ export function ChecklistSections({
                             <CollapsibleTrigger className="group flex w-full items-center gap-3 p-4 text-left">
                                 <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=closed]:-rotate-90" />
                                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                                    <span className="truncate font-semibold">
-                                        {section.title}
+                                    <span className="flex items-center gap-2">
+                                        <span className="truncate font-semibold">
+                                            {section.title}
+                                        </span>
+                                        {!section.counts_toward_progress && (
+                                            <OptionalBadge />
+                                        )}
                                     </span>
                                     {section.hands_on_shifts && (
                                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -166,6 +150,9 @@ export function ChecklistSections({
                                     <CategorySection
                                         key={category.id}
                                         category={category}
+                                        includeOptional={
+                                            !section.counts_toward_progress
+                                        }
                                         traineeId={traineeId}
                                         currentStepId={currentStepId}
                                         readOnly={readOnly}

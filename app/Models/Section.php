@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string|null $icon
  * @property int $order
  * @property SectionStatus $status
+ * @property bool $counts_toward_progress
  * @property string|null $pie_content_review
  * @property string|null $screen_to_shoulder
  * @property string|null $hands_on_shifts
@@ -32,7 +33,7 @@ class Section extends Model
 
     /** @var list<string> */
     protected $fillable = [
-        'title', 'description', 'icon', 'order', 'status',
+        'title', 'description', 'icon', 'order', 'status', 'counts_toward_progress',
         'pie_content_review', 'screen_to_shoulder', 'hands_on_shifts',
     ];
 
@@ -43,6 +44,7 @@ class Section extends Model
     {
         return [
             'status' => SectionStatus::class,
+            'counts_toward_progress' => 'boolean',
         ];
     }
 
@@ -103,6 +105,19 @@ class Section extends Model
     public function scopePublished(Builder $query): Builder
     {
         return $query->where('status', SectionStatus::Published);
+    }
+
+    /**
+     * Stations that count toward a trainee's completion, score and the
+     * reports. An optional station (e.g. Games) can still be worked through
+     * but is left out of all of them.
+     *
+     * @param  Builder<Section>  $query
+     * @return Builder<Section>
+     */
+    public function scopeCounted(Builder $query): Builder
+    {
+        return $query->where('counts_toward_progress', true);
     }
 
     /**

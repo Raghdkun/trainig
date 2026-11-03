@@ -9,27 +9,53 @@ use Illuminate\Validation\Rules\Enum;
 
 class QuizQuestionRequest extends FormRequest
 {
+    /** A question has between 2 and 6 answer options (A–F). */
+    public const MIN_OPTIONS = 2;
+
+    public const MAX_OPTIONS = 6;
+
+    /** A multi-answer question needs a wrong option left over, so at least 3. */
+    private const MIN_OPTIONS_MULTI = 3;
+
     /**
-     * Fixed at exactly 4 choices (A–D). Single-answer questions mark exactly
-     * one correct by index; multi-answer questions mark 2 or 3 (marking all
-     * 4 would make the question meaningless).
+     * Single-answer questions mark exactly one correct option by index;
+     * multi-answer questions mark 2 or more, but never every option (that
+     * would make the question meaningless).
      *
      * @return array<string, mixed>
      */
     public function rules(): array
     {
         $isSingle = $this->input('type', QuizQuestionType::Single->value) === QuizQuestionType::Single->value;
+        $optionCount = is_array($this->input('options')) ? count($this->input('options')) : 0;
+        $lastIndex = max($optionCount - 1, 0);
 
         return [
             'prompt' => ['required', 'string', 'max:500'],
             // Shown to the trainee on their results after they submit.
             'explanation' => ['nullable', 'string', 'max:1000'],
             'type' => ['required', new Enum(QuizQuestionType::class)],
-            'options' => ['required', 'array', 'size:4'],
+            'options' => [
+                'required',
+                'array',
+                'min:'.($isSingle ? self::MIN_OPTIONS : self::MIN_OPTIONS_MULTI),
+                'max:'.self::MAX_OPTIONS,
+            ],
             'options.*' => ['required', 'string', 'max:255'],
-            'correct_index' => [Rule::requiredIf($isSingle), 'integer', 'between:0,3'],
-            'correct_indexes' => [Rule::requiredIf(! $isSingle), 'array', 'min:2', 'max:3'],
-            'correct_indexes.*' => ['integer', 'between:0,3', 'distinct'],
+            'correct_index' => [Rule::requiredIf($isSingle), 'integer', 'between:0,'.$lastIndex],
+            'correct_indexes' => [Rule::requiredIf(! $isSingle), 'array', 'min:2', 'max:'.max($lastIndex, 2)],
+            'correct_indexes.*' => ['integer', 'between:0,'.$lastIndex, 'distinct'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'options.min' => __('Add at least :min answer options.'),
+            'options.max' => __('A question can have at most :max answer options.'),
         ];
     }
 

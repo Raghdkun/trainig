@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import Heading from '@/components/heading';
 import { ConfirmDeleteDialog } from '@/components/training/confirm-delete-dialog';
+import { OptionalBadge } from '@/components/training/optional-badge';
 import { SectionFormDialog } from '@/components/training/section-form-dialog';
 import { SectionStatusBadge } from '@/components/training/section-status-badge';
 import { Badge } from '@/components/ui/badge';
@@ -124,6 +125,9 @@ export default function BuilderIndex() {
                                         <SectionStatusBadge
                                             status={section.status}
                                         />
+                                        {!section.counts_toward_progress && (
+                                            <OptionalBadge />
+                                        )}
                                         <Badge variant="secondary">
                                             <Layers className="size-3" />
                                             {section.categories_count ?? 0}{' '}

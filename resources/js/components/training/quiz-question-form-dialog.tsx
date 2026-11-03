@@ -1,5 +1,5 @@
 import { useForm } from '@inertiajs/react';
-import { Check, Circle, ListChecks } from 'lucide-react';
+import { Check, Circle, ListChecks, Plus, X } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import InputError from '@/components/input-error';
@@ -21,9 +21,15 @@ import { cn } from '@/lib/utils';
 import { store, update } from '@/routes/training/quiz-questions';
 import type { QuizQuestion, QuizQuestionType } from '@/types/training';
 
-const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
+// A question has 2–6 answer options (mirrors QuizQuestionRequest).
+const OPTION_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+const MIN_OPTIONS = 2;
+const MAX_OPTIONS = OPTION_LETTERS.length;
+const DEFAULT_OPTIONS = 4;
+// A multi-answer question needs a wrong option left over, so at least 3
+// options, and it marks 2 or more correct but never every option.
+const MIN_OPTIONS_MULTI = 3;
 const MIN_MULTI_CORRECT = 2;
-const MAX_MULTI_CORRECT = 3;
 
 const TOGGLE_ACTIVE_CLASS =
     'data-[state=on]:border-primary/50 data-[state=on]:bg-primary/10 data-[state=on]:text-primary';
@@ -47,12 +53,9 @@ export function QuizQuestionFormDialog({
         prompt: question?.prompt ?? '',
         explanation: question?.explanation ?? '',
         type: (question?.type ?? 'single') as QuizQuestionType,
-        options: sortedOptions?.map((option) => option.text) ?? [
-            '',
-            '',
-            '',
-            '',
-        ],
+        options:
+            sortedOptions?.map((option) => option.text) ??
+            Array.from({ length: DEFAULT_OPTIONS }, () => ''),
         correct: sortedOptions
             ? sortedOptions.reduce<number[]>(
                   (indexes, option, index) =>
@@ -95,12 +98,47 @@ export function QuizQuestionFormDialog({
         );
     }
 
+    function addOption() {
+        if (form.data.options.length >= MAX_OPTIONS) {
+            return;
+        }
+
+        form.setData('options', [...form.data.options, '']);
+    }
+
+    function removeOption(index: number) {
+        if (form.data.options.length <= MIN_OPTIONS) {
+            return;
+        }
+
+        const options = form.data.options.filter((_, i) => i !== index);
+        // Drop the removed option from the correct set and shift the ones
+        // after it down so they keep pointing at the same answers.
+        const correct = form.data.correct
+            .filter((i) => i !== index)
+            .map((i) => (i > index ? i - 1 : i));
+        // Too few options left for a multi-answer question: back to single.
+        const type: QuizQuestionType =
+            options.length < MIN_OPTIONS_MULTI ? 'single' : form.data.type;
+
+        form.setData({
+            ...form.data,
+            options,
+            type,
+            correct: type === 'single' ? correct.slice(0, 1) : correct,
+        });
+    }
+
     const isSingle = form.data.type === 'single';
+    const optionCount = form.data.options.length;
+    const canBeMulti = optionCount >= MIN_OPTIONS_MULTI;
+    const maxMultiCorrect = optionCount - 1;
     const correctCount = form.data.correct.length;
     const canSave = isSingle
         ? correctCount === 1
-        : correctCount >= MIN_MULTI_CORRECT &&
-          correctCount <= MAX_MULTI_CORRECT;
+        : canBeMulti &&
+          correctCount >= MIN_MULTI_CORRECT &&
+          correctCount <= maxMultiCorrect;
 
     function submit(event: FormEvent) {
         event.preventDefault();
@@ -138,7 +176,8 @@ export function QuizQuestionFormDialog({
                     </DialogTitle>
                     <DialogDescription>
                         A short multiple-choice check trainees answer after this
-                        station.
+                        station. Use {MIN_OPTIONS} to {MAX_OPTIONS} answer
+                        options.
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-5">
@@ -179,6 +218,7 @@ export function QuizQuestionFormDialog({
                             </ToggleGroupItem>
                             <ToggleGroupItem
                                 value="multi"
+                                disabled={!canBeMulti}
                                 className={cn(
                                     'flex-1 gap-1.5',
                                     TOGGLE_ACTIVE_CLASS,
@@ -190,7 +230,11 @@ export function QuizQuestionFormDialog({
                         </ToggleGroup>
                         <p className="text-xs text-muted-foreground">
                             {isSingle ? (
-                                'Trainees pick exactly one correct answer.'
+                                <>
+                                    Trainees pick exactly one correct answer.
+                                    {!canBeMulti &&
+                                        ` Multiple answers needs at least ${MIN_OPTIONS_MULTI} options.`}
+                                </>
                             ) : (
                                 <>
                                     Trainees must select every correct answer to
@@ -204,7 +248,7 @@ export function QuizQuestionFormDialog({
                                         )}
                                     >
                                         Mark {MIN_MULTI_CORRECT}–
-                                        {MAX_MULTI_CORRECT} as correct (
+                                        {maxMultiCorrect} as correct (
                                         {correctCount} selected).
                                     </span>
                                 </>
@@ -213,7 +257,12 @@ export function QuizQuestionFormDialog({
                     </div>
 
                     <div className="grid gap-2">
-                        <Label>Answers</Label>
+                        <div className="flex items-center justify-between gap-2">
+                            <Label>Answers</Label>
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                                {optionCount} of {MAX_OPTIONS} options
+                            </span>
+                        </div>
                         {form.data.options.map((text, index) => {
                             const isCorrect = form.data.correct.includes(index);
 
@@ -256,9 +305,31 @@ export function QuizQuestionFormDialog({
                                     {isCorrect && (
                                         <Check className="size-4 shrink-0 text-emerald-500" />
                                     )}
+                                    {optionCount > MIN_OPTIONS && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => removeOption(index)}
+                                            aria-label={`Remove option ${OPTION_LETTERS[index]}`}
+                                            className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
+                                        >
+                                            <X className="size-4" />
+                                        </Button>
+                                    )}
                                 </div>
                             );
                         })}
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={addOption}
+                            disabled={optionCount >= MAX_OPTIONS}
+                            className="w-fit"
+                        >
+                            <Plus className="size-4" /> Add option
+                        </Button>
                         <InputError message={form.errors.options} />
                         <InputError
                             message={

@@ -29,6 +29,8 @@ export type ChecklistItem = {
     content: string | null;
     importance: Importance | null;
     requires_rating: boolean;
+    /** Off = optional: left out of completion, score and reports. */
+    counts_toward_progress: boolean;
     order: number;
     children?: ChecklistItem[];
     media?: MediaItem[];
@@ -53,6 +55,8 @@ export type Section = {
     icon: string | null;
     order: number;
     status: SectionStatus;
+    /** Off = optional station (e.g. Games): left out of completion, score and reports. */
+    counts_toward_progress: boolean;
     pie_content_review: string | null;
     screen_to_shoulder: string | null;
     hands_on_shifts: string | null;
@@ -133,8 +137,12 @@ export type TraineeSummary = {
     position: string | null;
     store: StoreOption;
     stats: TraineeStats;
+    /** Only sent by the Trainees index (Y-m-d). */
+    hired_at?: string | null;
     /** Only sent by the Trainees index. */
     archive_pending?: boolean;
+    /** Only sent by the Trainees index; set once the trainee is archived. */
+    archive_reason?: string | null;
 };
 
 export type TraineeDetail = {
@@ -146,6 +154,8 @@ export type TraineeDetail = {
     managers: { id: number; name: string }[];
     archived_at: string | null;
     archived_by: { id: number; name: string } | null;
+    /** Why the trainee was archived (the manager's request reason). */
+    archive_reason: string | null;
 };
 
 export type ArchiveRequestStatus = 'pending' | 'approved' | 'rejected';
@@ -185,6 +195,7 @@ export type EvaluationItem = {
     content: string | null;
     importance: Importance | null;
     requires_rating: boolean;
+    counts_toward_progress: boolean;
     order: number;
     media: MediaItem[];
     children: EvaluationItem[];
@@ -227,6 +238,7 @@ export type ProgressSection = {
     title: string;
     description: string | null;
     icon: string | null;
+    counts_toward_progress: boolean;
     pie_content_review: string | null;
     screen_to_shoulder: string | null;
     hands_on_shifts: string | null;

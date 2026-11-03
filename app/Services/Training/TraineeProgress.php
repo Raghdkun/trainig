@@ -16,11 +16,15 @@ class TraineeProgress
     /** @var Collection<int, int>|null */
     private ?Collection $leafIds = null;
 
+    /** @var Collection<int, int>|null */
+    private ?Collection $uncountedIds = null;
+
     /**
      * IDs of leaf checklist items (those with no sub-items) in published
      * stations. Only leaves count toward completion, so a parent never
      * double-counts with its children; draft stations are excluded so their
-     * unfinished content never affects completion totals or reports.
+     * unfinished content never affects completion totals or reports. Optional
+     * items and stations (counts_toward_progress off) are left out too.
      *
      * @return Collection<int, int>
      */
@@ -28,7 +32,23 @@ class TraineeProgress
     {
         return $this->leafIds ??= ChecklistItem::query()
             ->whereDoesntHave('children')
-            ->whereHas('category.section', fn ($query) => $query->published())
+            ->where('counts_toward_progress', true)
+            ->whereHas('category.section', fn ($query) => $query->published()->counted())
+            ->pluck('id');
+    }
+
+    /**
+     * IDs of every item (leaf or parent) that is optional — flagged itself, or
+     * inside an optional station. They can still be checked off and rated, but
+     * never count toward a score, so rating queries leave them out.
+     *
+     * @return Collection<int, int>
+     */
+    public function uncountedItemIds(): Collection
+    {
+        return $this->uncountedIds ??= ChecklistItem::query()
+            ->where('counts_toward_progress', false)
+            ->orWhereHas('category.section', fn ($query) => $query->where('counts_toward_progress', false))
             ->pluck('id');
     }
 
@@ -55,6 +75,7 @@ class TraineeProgress
         $averages = Evaluation::query()
             ->whereIn('trainee_id', $ids)
             ->whereNotNull('rating')
+            ->whereNotIn('checklist_item_id', $this->uncountedItemIds())
             ->selectRaw('trainee_id, avg(rating) as aggregate')
             ->groupBy('trainee_id')
             ->pluck('aggregate', 'trainee_id');
@@ -100,13 +121,16 @@ class TraineeProgress
             ->unique(fn (QuizAttempt $attempt): int => $attempt->quiz->section_id)
             ->keyBy(fn (QuizAttempt $attempt): int => $attempt->quiz->section_id);
         $currentStepId = null;
+        // Optional items stay visible and checkable but are never the "current
+        // step" and never feed an average.
+        $uncounted = $this->uncountedItemIds()->flip();
 
-        $mapItem = function (ChecklistItem $item) use (&$mapItem, $evaluations, &$currentStepId): array {
+        $mapItem = function (ChecklistItem $item) use (&$mapItem, $evaluations, &$currentStepId, $uncounted): array {
             $children = $item->childrenRecursive->map($mapItem)->all();
             $evaluation = $evaluations->get($item->id);
             $completed = (bool) $evaluation?->completed;
 
-            if (count($children) === 0 && ! $completed && $currentStepId === null) {
+            if (count($children) === 0 && ! $completed && $currentStepId === null && ! $uncounted->has($item->id)) {
                 $currentStepId = $item->id;
             }
 
@@ -118,6 +142,7 @@ class TraineeProgress
                 'content' => $item->content,
                 'importance' => $item->importance,
                 'requires_rating' => $item->requires_rating,
+                'counts_toward_progress' => $item->counts_toward_progress,
                 'order' => $item->order,
                 'media' => $item->media,
                 'children' => $children,
@@ -130,11 +155,11 @@ class TraineeProgress
         };
 
         // Collect the non-null scores under a set of items (recursing sub-items).
-        $collectRatings = function ($items) use (&$collectRatings, $evaluations): array {
+        $collectRatings = function ($items) use (&$collectRatings, $evaluations, $uncounted): array {
             $ratings = [];
             foreach ($items as $item) {
                 $evaluation = $evaluations->get($item->id);
-                if ($evaluation && $evaluation->rating !== null) {
+                if ($evaluation && $evaluation->rating !== null && ! $uncounted->has($item->id)) {
                     $ratings[] = (int) $evaluation->rating;
                 }
                 $ratings = array_merge($ratings, $collectRatings($item->childrenRecursive));
@@ -169,6 +194,7 @@ class TraineeProgress
                 'title' => $section->title,
                 'description' => $section->description,
                 'icon' => $section->icon,
+                'counts_toward_progress' => $section->counts_toward_progress,
                 'pie_content_review' => $section->pie_content_review,
                 'screen_to_shoulder' => $section->screen_to_shoulder,
                 'hands_on_shifts' => $section->hands_on_shifts,
@@ -281,6 +307,7 @@ class TraineeProgress
             'content' => $item->content,
             'importance' => $item->importance,
             'requires_rating' => $item->requires_rating,
+            'counts_toward_progress' => $item->counts_toward_progress,
             'order' => $item->order,
             'media' => $item->media,
             'children' => [],
@@ -333,6 +360,7 @@ class TraineeProgress
                     'title' => $section->title,
                     'description' => $section->description,
                     'icon' => $section->icon,
+                    'counts_toward_progress' => $section->counts_toward_progress,
                     'pie_content_review' => $section->pie_content_review,
                     'screen_to_shoulder' => $section->screen_to_shoulder,
                     'hands_on_shifts' => $section->hands_on_shifts,

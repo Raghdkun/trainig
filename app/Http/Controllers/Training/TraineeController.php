@@ -51,9 +51,11 @@ class TraineeController extends Controller
                 'id' => $trainee->id,
                 'name' => $trainee->name,
                 'position' => $trainee->position,
+                'hired_at' => $trainee->hired_at?->toDateString(),
                 'store' => $trainee->store->only(['id', 'name']),
                 'stats' => $stats[$trainee->id],
                 'archive_pending' => (bool) $trainee->archive_pending,
+                'archive_reason' => $trainee->archive_reason,
             ])->all(),
             'stores' => $canChooseStore
                 ? ($user->isSuperAdmin() ? Store::orderBy('name')->get(['id', 'name']) : $user->stores()->orderBy('stores.name')->get(['stores.id', 'stores.name']))
@@ -151,6 +153,7 @@ class TraineeController extends Controller
                 'managers' => $trainee->managers->map->only(['id', 'name'])->values(),
                 'archived_at' => $trainee->archived_at?->toIso8601String(),
                 'archived_by' => $trainee->archivedBy?->only(['id', 'name']),
+                'archive_reason' => $trainee->archive_reason,
             ],
             'archiveRequest' => $archiveRequest && ! $trainee->isArchived() ? [
                 'id' => $archiveRequest->id,
@@ -269,6 +272,8 @@ class TraineeController extends Controller
             $trainee->update([
                 'archived_at' => now(),
                 'archived_by' => $request->user()->id,
+                // Keep the manager's reason if they had already asked for this.
+                'archive_reason' => $trainee->archiveRequests()->pending()->latest('id')->value('reason'),
             ]);
 
             $trainee->archiveRequests()->pending()->update([
@@ -291,7 +296,7 @@ class TraineeController extends Controller
     {
         $this->authorize('update', $trainee);
 
-        $trainee->update(['archived_at' => null, 'archived_by' => null]);
+        $trainee->update(['archived_at' => null, 'archived_by' => null, 'archive_reason' => null]);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Trainee restored.')]);
 

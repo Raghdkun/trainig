@@ -1,0 +1,1 @@
+function e(e){return new Date(`${e}T00:00:00`).toLocaleDateString(void 0,{year:`numeric`,month:`short`,day:`numeric`})}export{e as t};

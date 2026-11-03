@@ -93,7 +93,12 @@ class RecordEvaluation
 
     private function recomputeParent(Trainee $trainee, int $parentId, User $evaluator): void
     {
-        $childIds = ChecklistItem::where('parent_id', $parentId)->pluck('id');
+        $children = ChecklistItem::where('parent_id', $parentId)->get(['id', 'counts_toward_progress']);
+
+        // An optional sub-step never holds its parent back — unless every
+        // sub-step is optional, in which case they all have to be done.
+        $required = $children->where('counts_toward_progress', true);
+        $childIds = ($required->isNotEmpty() ? $required : $children)->pluck('id');
 
         $completedChildren = Evaluation::where('trainee_id', $trainee->id)
             ->whereIn('checklist_item_id', $childIds)

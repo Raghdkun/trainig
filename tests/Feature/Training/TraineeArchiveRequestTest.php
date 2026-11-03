@@ -134,6 +134,73 @@ class TraineeArchiveRequestTest extends TestCase
         $this->assertSame($admin->id, $trainee->archived_by);
     }
 
+    public function test_approval_saves_the_managers_reason_on_the_trainee(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+        $archiveRequest = TraineeArchiveRequest::factory()->create(['reason' => 'Moved to another company.']);
+
+        $this->actingAs($admin)
+            ->patch(route('training.archive-requests.approve', $archiveRequest))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('Moved to another company.', $archiveRequest->trainee->refresh()->archive_reason);
+    }
+
+    public function test_direct_archive_keeps_a_pending_requests_reason(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+        $archiveRequest = TraineeArchiveRequest::factory()->create(['reason' => 'Finished all stations.']);
+
+        $this->actingAs($admin)->patch(route('trainees.archive', $archiveRequest->trainee));
+
+        $this->assertSame('Finished all stations.', $archiveRequest->trainee->refresh()->archive_reason);
+    }
+
+    public function test_direct_archive_without_a_request_has_no_reason(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+        $trainee = Trainee::factory()->create();
+
+        $this->actingAs($admin)->patch(route('trainees.archive', $trainee));
+
+        $this->assertTrue($trainee->refresh()->isArchived());
+        $this->assertNull($trainee->archive_reason);
+    }
+
+    public function test_restoring_a_trainee_clears_the_archive_reason(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+        $trainee = Trainee::factory()->archived()->create(['archive_reason' => 'Left the company.']);
+
+        $this->actingAs($admin)->patch(route('trainees.restore', $trainee));
+
+        $this->assertNull($trainee->refresh()->archive_reason);
+    }
+
+    public function test_archive_reason_is_shown_on_the_trainee_page_and_archived_list(): void
+    {
+        $this->withoutVite();
+        $store = Store::factory()->create();
+        $manager = User::factory()->manager($store)->create();
+        $admin = User::factory()->superAdmin()->create();
+        $trainee = Trainee::factory()->forStore($store)->archived()->create(['archive_reason' => 'Left the company.']);
+        $trainee->managers()->attach($manager);
+
+        foreach ([$admin, $manager] as $viewer) {
+            $this->actingAs($viewer)
+                ->get(route('trainees.show', $trainee))
+                ->assertInertia(fn (AssertableInertia $page) => $page
+                    ->where('trainee.archive_reason', 'Left the company.')
+                );
+        }
+
+        $this->actingAs($admin)
+            ->get(route('trainees.index', ['tab' => 'archived']))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('trainees.0.archive_reason', 'Left the company.')
+            );
+    }
+
     public function test_admin_rejection_keeps_trainee_active_with_a_note(): void
     {
         $admin = User::factory()->superAdmin()->create();

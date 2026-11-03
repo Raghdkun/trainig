@@ -24,6 +24,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $created_by
  * @property Carbon|null $archived_at
  * @property int|null $archived_by
+ * @property string|null $archive_reason
  * @property DevelopmentStatus|null $development_status
  * @property bool $development_only
  * @property-read Store $store
@@ -47,7 +48,7 @@ class Trainee extends Model
     /** @var list<string> */
     protected $fillable = [
         'store_id', 'name', 'position', 'hired_at', 'created_by',
-        'archived_at', 'archived_by', 'development_status', 'development_only',
+        'archived_at', 'archived_by', 'archive_reason', 'development_status', 'development_only',
     ];
 
     /**

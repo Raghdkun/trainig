@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -30,6 +31,7 @@ export function SectionFormDialog({
         title: section?.title ?? '',
         description: section?.description ?? '',
         icon: section?.icon ?? '',
+        counts_toward_progress: section?.counts_toward_progress ?? true,
         pie_content_review: section?.pie_content_review ?? '',
         screen_to_shoulder: section?.screen_to_shoulder ?? '',
         hands_on_shifts: section?.hands_on_shifts ?? '',
@@ -148,6 +150,36 @@ export function SectionFormDialog({
                                     )
                                 }
                                 placeholder="2 hours"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 rounded-md border p-3">
+                        <Checkbox
+                            id="section-counts"
+                            checked={form.data.counts_toward_progress}
+                            onCheckedChange={(value) =>
+                                form.setData(
+                                    'counts_toward_progress',
+                                    value === true,
+                                )
+                            }
+                            className="mt-0.5"
+                        />
+                        <div className="grid gap-1">
+                            <Label
+                                htmlFor="section-counts"
+                                className="font-medium"
+                            >
+                                Counts toward evaluation
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                                When off, this station is optional: trainees can
+                                still do it, but it is left out of completion,
+                                average score and reports.
+                            </p>
+                            <InputError
+                                message={form.errors.counts_toward_progress}
                             />
                         </div>
                     </div>

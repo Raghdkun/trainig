@@ -46,16 +46,13 @@ class TraineePolicy
     }
 
     /**
-     * Same archived-is-frozen rule as update() — a manager may delete a
-     * trainee they're assigned to only while still active.
+     * Permanently deleting a trainee (and their whole evaluation history) is
+     * reserved for super admins (handled by Gate::before). A store manager
+     * retires a trainee through an archive request instead.
      */
     public function delete(User $user, Trainee $trainee): bool
     {
-        if ($trainee->isArchived()) {
-            return false;
-        }
-
-        return $this->isAssigned($user, $trainee);
+        return false;
     }
 
     /**

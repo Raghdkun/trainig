@@ -66,6 +66,31 @@ class QuizVersioningTest extends TestCase
         $this->assertSame(1, $v2->questions()->where('prompt', 'Reworded?')->count());
     }
 
+    public function test_a_two_option_edit_on_a_sent_quiz_lands_on_the_new_version_only(): void
+    {
+        $v1 = $this->quiz();
+        QuizAttempt::factory()->create(['quiz_id' => $v1->id]);
+        $question = $v1->questions()->first();
+
+        $this->actingAs($this->admin())
+            ->put(route('training.quiz-questions.update', $question), [
+                'prompt' => 'True or false?',
+                'type' => 'single',
+                'options' => ['True', 'False'],
+                'correct_index' => 1,
+            ])
+            ->assertSessionHasNoErrors();
+
+        // v1 keeps its four options; v2's copy has the two the admin chose.
+        $this->assertSame(4, $question->fresh()->options()->count());
+
+        $v2 = $v1->section->fresh()->quiz;
+        $edited = $v2->questions()->where('prompt', 'True or false?')->firstOrFail();
+        $this->assertSame(2, $edited->options()->count());
+        $this->assertSame('False', $edited->options()->where('is_correct', true)->value('text'));
+        $this->assertSame(3, $v2->questions()->count());
+    }
+
     public function test_explanations_carry_over_to_the_next_version(): void
     {
         $v1 = $this->quiz();

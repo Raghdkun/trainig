@@ -47,29 +47,63 @@ class QuizTest extends TestCase
         ])->assertForbidden();
     }
 
-    public function test_a_quiz_question_needs_exactly_four_options_and_one_correct_index(): void
+    public function test_a_quiz_question_takes_two_to_six_options_and_one_correct_index(): void
     {
         $admin = User::factory()->superAdmin()->create();
         $quiz = Quiz::factory()->create();
 
-        $this->actingAs($admin)->post(route('training.quiz-questions.store', $quiz), [
-            'prompt' => 'What comes first?',
-            'type' => 'single',
-            'options' => ['Wash hands', 'Wear gloves', 'Preheat oven'],
-            'correct_index' => 0,
-        ])->assertSessionHasErrors('options');
+        $submit = fn (array $options, int $correctIndex = 0) => $this->actingAs($admin)
+            ->post(route('training.quiz-questions.store', $quiz), [
+                'prompt' => 'How many options?',
+                'type' => 'single',
+                'options' => $options,
+                'correct_index' => $correctIndex,
+            ]);
 
-        $this->actingAs($admin)->post(route('training.quiz-questions.store', $quiz), [
-            'prompt' => 'What comes first?',
-            'type' => 'single',
-            'options' => ['Wash hands', 'Wear gloves', 'Preheat oven', 'Clock in'],
-            'correct_index' => 0,
-        ])->assertSessionHasNoErrors();
+        $submit(['Only one'])->assertSessionHasErrors('options');
+        $submit(['a', 'b', 'c', 'd', 'e', 'f', 'g'])->assertSessionHasErrors('options');
+        $submit(['Yes', 'No'], correctIndex: 2)->assertSessionHasErrors('correct_index');
+        $this->assertSame(0, $quiz->questions()->count());
 
-        $question = QuizQuestion::firstWhere('prompt', 'What comes first?');
-        $this->assertCount(4, $question->options);
-        $this->assertSame(1, $question->options()->where('is_correct', true)->count());
-        $this->assertTrue($question->options()->orderBy('order')->first()->is_correct);
+        foreach ([2, 4, 6] as $count) {
+            $options = array_map(fn (int $number): string => "Option {$number}", range(1, $count));
+
+            $submit($options, $count - 1)->assertSessionHasNoErrors();
+        }
+
+        $this->assertEquals(
+            [2, 4, 6],
+            $quiz->questions()->withCount('options')->orderBy('id')->pluck('options_count')->all(),
+        );
+
+        $last = $quiz->questions()->latest('id')->first();
+        $this->assertSame(1, $last->options()->where('is_correct', true)->count());
+        $this->assertTrue($last->options()->orderBy('order')->get()->last()->is_correct);
+    }
+
+    public function test_a_multi_choice_question_needs_three_options_and_never_marks_them_all(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+        $quiz = Quiz::factory()->create();
+
+        $submit = fn (array $options, array $correct) => $this->actingAs($admin)
+            ->post(route('training.quiz-questions.store', $quiz), [
+                'prompt' => 'Which are right?',
+                'type' => 'multi',
+                'options' => $options,
+                'correct_indexes' => $correct,
+            ]);
+
+        $submit(['Yes', 'No'], [0, 1])->assertSessionHasErrors('options');
+        $submit(['a', 'b', 'c'], [0, 1, 2])->assertSessionHasErrors('correct_indexes');
+        $submit(['a', 'b', 'c'], [0, 3])->assertSessionHasErrors('correct_indexes.1');
+        $submit(['a', 'b', 'c', 'd', 'e'], [0, 1, 2, 3, 4])->assertSessionHasErrors('correct_indexes');
+        $this->assertSame(0, $quiz->questions()->count());
+
+        $submit(['a', 'b', 'c'], [0, 2])->assertSessionHasNoErrors();
+        $submit(['a', 'b', 'c', 'd', 'e'], [0, 1, 2, 3])->assertSessionHasNoErrors();
+
+        $this->assertSame(2, $quiz->questions()->count());
     }
 
     public function test_a_multi_choice_question_needs_two_or_three_correct_answers(): void
@@ -408,6 +442,25 @@ class QuizTest extends TestCase
                     fn ($option) => $option['id'] === $missedCorrect->id && $option['is_correct'] && ! $option['is_chosen'],
                 ))
             );
+    }
+
+    public function test_a_question_with_two_options_is_shown_and_scored(): void
+    {
+        $this->withoutVite();
+        $quiz = Quiz::factory()->create();
+        $question = QuizQuestion::factory()->create(['quiz_id' => $quiz->id, 'prompt' => 'Is the walk-in cold enough?']);
+        $question->options()->create(['text' => 'Yes', 'is_correct' => true, 'order' => 0]);
+        $question->options()->create(['text' => 'No', 'is_correct' => false, 'order' => 1]);
+        $attempt = QuizAttempt::factory()->create(['quiz_id' => $quiz->id]);
+
+        $this->get(route('quiz.show', $attempt->token))
+            ->assertInertia(fn (AssertableInertia $page) => $page->has('questions.0.options', 2));
+
+        $this->post(route('quiz.store', $attempt->token), ['answers' => [
+            $question->id => [$question->options()->where('is_correct', true)->value('id')],
+        ]])->assertRedirect(route('quiz.show', $attempt->token));
+
+        $this->assertEquals(100, $attempt->refresh()->score);
     }
 
     public function test_confirming_the_results_were_reviewed_closes_the_link(): void

@@ -37,4 +37,12 @@ class SectionFactory extends Factory
     {
         return $this->state(['status' => SectionStatus::Published]);
     }
+
+    /**
+     * An optional station — left out of completion, score and reports.
+     */
+    public function uncounted(): static
+    {
+        return $this->state(['counts_toward_progress' => false]);
+    }
 }
