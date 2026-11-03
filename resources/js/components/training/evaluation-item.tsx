@@ -3,6 +3,7 @@ import { Lock } from 'lucide-react';
 import { useState } from 'react';
 import { ImportanceBadge } from '@/components/training/importance-badge';
 import { MediaAttachments } from '@/components/training/media-attachments';
+import { OptionalBadge } from '@/components/training/optional-badge';
 import { RatingInput } from '@/components/training/rating-input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,11 +28,13 @@ export function EvaluationItem({
     item,
     traineeId,
     currentStepId,
+    readOnly = false,
     isSub = false,
 }: {
     item: EvaluationItemType;
     traineeId: number;
     currentStepId: number | null;
+    readOnly?: boolean;
     isSub?: boolean;
 }) {
     // Only leaf items are checkable; a parent reflects its children.
@@ -41,6 +44,7 @@ export function EvaluationItem({
                 item={item}
                 traineeId={traineeId}
                 currentStepId={currentStepId}
+                readOnly={readOnly}
                 isSub={isSub}
             />
         );
@@ -51,6 +55,7 @@ export function EvaluationItem({
             item={item}
             traineeId={traineeId}
             currentStepId={currentStepId}
+            readOnly={readOnly}
             isSub={isSub}
         />
     );
@@ -60,11 +65,13 @@ function EvaluationParent({
     item,
     traineeId,
     currentStepId,
+    readOnly,
     isSub,
 }: {
     item: EvaluationItemType;
     traineeId: number;
     currentStepId: number | null;
+    readOnly: boolean;
     isSub: boolean;
 }) {
     const completed = item.evaluation?.completed ?? false;
@@ -79,6 +86,7 @@ function EvaluationParent({
             <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold">{item.title}</span>
                 <ImportanceBadge importance={item.importance} />
+                {!item.counts_toward_progress && <OptionalBadge />}
                 {completed && (
                     <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
                         Complete
@@ -105,6 +113,7 @@ function EvaluationParent({
                         item={child}
                         traineeId={traineeId}
                         currentStepId={currentStepId}
+                        readOnly={readOnly}
                         isSub
                     />
                 ))}
@@ -117,11 +126,13 @@ function EvaluationLeaf({
     item,
     traineeId,
     currentStepId,
+    readOnly,
     isSub,
 }: {
     item: EvaluationItemType;
     traineeId: number;
     currentStepId: number | null;
+    readOnly: boolean;
     isSub: boolean;
 }) {
     const ev = item.evaluation;
@@ -153,9 +164,16 @@ function EvaluationLeaf({
         nextRating: number | null,
         nextNotes: string,
     ) {
+        // The inputs are already disabled when read-only; this is just a
+        // second line of defense (the server rejects it either way).
+        if (readOnly) {
+            return;
+        }
+
         // Invariant: a scored item can only complete with a score and a note; a
         // not-rated item never carries a score.
-        const valid = !scored || (nextRating !== null && nextNotes.trim() !== '');
+        const valid =
+            !scored || (nextRating !== null && nextNotes.trim() !== '');
         const finalCompleted = nextCompleted && valid;
         const finalRating = scored ? nextRating : null;
 
@@ -201,7 +219,7 @@ function EvaluationLeaf({
             <div className="flex items-start gap-3">
                 <Checkbox
                     checked={completed}
-                    disabled={!completed && !canComplete}
+                    disabled={readOnly || (!completed && !canComplete)}
                     onCheckedChange={(value) => toggle(value === true)}
                     className="mt-0.5"
                 />
@@ -218,6 +236,7 @@ function EvaluationLeaf({
                             {item.title}
                         </span>
                         <ImportanceBadge importance={item.importance} />
+                        {!item.counts_toward_progress && <OptionalBadge />}
                         {isCurrent && (
                             <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
                                 Current step
@@ -233,18 +252,27 @@ function EvaluationLeaf({
 
                     <MediaAttachments media={item.media} />
 
-                    {scored && <RatingInput value={rating} onChange={rate} />}
+                    {scored && (
+                        <RatingInput
+                            value={rating}
+                            onChange={rate}
+                            disabled={readOnly}
+                        />
+                    )}
 
                     <Textarea
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         onBlur={commitNotes}
-                        placeholder={scored ? 'Add a note…' : 'Add a note (optional)…'}
+                        disabled={readOnly}
+                        placeholder={
+                            scored ? 'Add a note…' : 'Add a note (optional)…'
+                        }
                         className="min-h-0 resize-none py-1.5 text-sm"
                         rows={2}
                     />
 
-                    {scored && !completed && !canComplete && (
+                    {!readOnly && scored && !completed && !canComplete && (
                         <p className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Lock className="size-3" />
                             Add a score and a note to mark this step complete.

@@ -13,18 +13,27 @@ use App\Models\User;
 final class ReportScope
 {
     /**
-     * @param  array<int, int>  $traineeIds
+     * @param  list<int>  $storeIds  Stores being compared; empty means all stores.
+     * @param  array<int, int>  $traineeIds  Roster trainees (excludes Development Zone–only employees).
+     * @param  array<int, int>  $developmentTraineeIds  Everyone currently in the Development Zone.
      */
     public function __construct(
         public readonly User $user,
         public readonly array $traineeIds,
-        public readonly ?int $storeId,
+        public readonly array $storeIds,
         public readonly int $weeks,
+        public readonly bool $includeArchived = false,
+        public readonly array $developmentTraineeIds = [],
     ) {}
 
     public function isSuperAdmin(): bool
     {
         return $this->user->isSuperAdmin();
+    }
+
+    public function hasStoreFilter(): bool
+    {
+        return $this->storeIds !== [];
     }
 
     public function isEmpty(): bool

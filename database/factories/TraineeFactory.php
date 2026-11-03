@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Enums\DevelopmentStatus;
+use App\Enums\Position;
 use App\Models\Store;
 use App\Models\Trainee;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -21,7 +23,7 @@ class TraineeFactory extends Factory
         return [
             'store_id' => Store::factory(),
             'name' => fake()->name(),
-            'position' => fake()->randomElement(['Crew Member', 'Shift Lead', 'Cashier', 'Cook']),
+            'position' => fake()->randomElement([Position::CrewMember, Position::CrewLeader])->value,
             'hired_at' => fake()->dateTimeBetween('-1 year', 'now'),
             'created_by' => null,
         ];
@@ -34,6 +36,37 @@ class TraineeFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'store_id' => $store->id,
+        ]);
+    }
+
+    /**
+     * Retired from the active roster.
+     */
+    public function archived(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'archived_at' => now(),
+        ]);
+    }
+
+    /**
+     * An employee added straight into the Development Zone — not on the
+     * Trainees roster.
+     */
+    public function developmentOnly(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'development_only' => true,
+        ]);
+    }
+
+    /**
+     * In the Development Zone at the given lifecycle status.
+     */
+    public function developmentStatus(DevelopmentStatus $status): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'development_status' => $status,
         ]);
     }
 }

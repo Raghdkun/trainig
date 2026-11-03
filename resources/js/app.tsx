@@ -16,6 +16,10 @@ createInertiaApp({
                 return null;
             case name.startsWith('errors/'):
                 return null;
+            case name.startsWith('quiz/'):
+                // The employee-facing quiz has no account in this system —
+                // no sidebar, no nav, just the questions.
+                return null;
             case name.startsWith('auth/'):
                 return AuthLayout;
             case name.startsWith('settings/'):

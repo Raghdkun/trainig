@@ -42,6 +42,63 @@ class ReportExportTest extends TestCase
             );
     }
 
+    public function test_the_hub_combines_the_selected_stores(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+        $storeA = Store::factory()->create();
+        $storeB = Store::factory()->create();
+        $storeC = Store::factory()->create();
+        Trainee::factory()->forStore($storeA)->create();
+        Trainee::factory()->count(2)->forStore($storeB)->create();
+        Trainee::factory()->forStore($storeC)->create();
+
+        $this->actingAs($admin)
+            ->get(route('reports.index', ['stores' => [$storeA->id, $storeB->id]]))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('filters.stores', [$storeA->id, $storeB->id])
+                ->where('overview.trainees', 3)
+            );
+
+        // A single store from the sidebar switcher (or an older link) still works.
+        $this->actingAs($admin)
+            ->get(route('reports.index', ['store' => $storeC->id]))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('filters.stores', [$storeC->id])
+                ->where('overview.trainees', 1)
+            );
+
+        $this->actingAs($admin)
+            ->get(route('reports.index'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('filters.stores', [])
+                ->where('overview.trainees', 4)
+            );
+    }
+
+    public function test_csv_export_respects_the_selected_stores(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+        $storeA = Store::factory()->create();
+        $storeB = Store::factory()->create();
+        $storeC = Store::factory()->create();
+        Trainee::factory()->forStore($storeA)->create(['name' => 'Alpha Trainee']);
+        Trainee::factory()->forStore($storeB)->create(['name' => 'Bravo Trainee']);
+        Trainee::factory()->forStore($storeC)->create(['name' => 'Charlie Trainee']);
+
+        $content = $this->actingAs($admin)
+            ->get(route('reports.export', [
+                'format' => 'csv',
+                'report' => 'trainees',
+                'stores' => [$storeA->id, $storeB->id],
+            ]))
+            ->assertOk()
+            ->streamedContent();
+
+        $this->assertStringContainsString('Alpha Trainee', $content);
+        $this->assertStringContainsString('Bravo Trainee', $content);
+        $this->assertStringNotContainsString('Charlie Trainee', $content);
+    }
+
     public function test_csv_export_streams_trainee_rows(): void
     {
         $admin = User::factory()->superAdmin()->create();

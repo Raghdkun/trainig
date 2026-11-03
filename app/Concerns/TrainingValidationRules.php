@@ -28,6 +28,8 @@ trait TrainingValidationRules
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
             'icon' => ['nullable', 'string', 'max:255'],
+            // Optional: absent leaves the value unchanged (DB defaults to true).
+            'counts_toward_progress' => ['sometimes', 'boolean'],
             'pie_content_review' => ['nullable', 'string', 'max:255'],
             'screen_to_shoulder' => ['nullable', 'string', 'max:255'],
             'hands_on_shifts' => ['nullable', 'string', 'max:255'],
@@ -59,6 +61,7 @@ trait TrainingValidationRules
             // Optional: absent leaves the value unchanged (DB defaults to true),
             // so partial updates and older clients keep working.
             'requires_rating' => ['sometimes', 'boolean'],
+            'counts_toward_progress' => ['sometimes', 'boolean'],
             'parent_id' => [
                 'nullable',
                 Rule::exists('checklist_items', 'id')->where('category_id', $categoryId),

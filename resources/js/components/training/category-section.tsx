@@ -8,51 +8,30 @@ import {
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { categoryColorClasses } from '@/lib/category-colors';
+import { leafCount } from '@/lib/leaf-count';
 import { cn } from '@/lib/utils';
-import type {
-    EvaluationItem as EvaluationItemType,
-    ProgressCategory,
-} from '@/types/training';
-
-function leafCount(items: EvaluationItemType[]): {
-    done: number;
-    total: number;
-} {
-    return items.reduce(
-        (acc, item) => {
-            if (item.children.length > 0) {
-                const child = leafCount(item.children);
-
-                return {
-                    done: acc.done + child.done,
-                    total: acc.total + child.total,
-                };
-            }
-
-            return {
-                done: acc.done + (item.evaluation?.completed ? 1 : 0),
-                total: acc.total + 1,
-            };
-        },
-        { done: 0, total: 0 },
-    );
-}
+import type { ProgressCategory } from '@/types/training';
 
 export function CategorySection({
     category,
+    includeOptional = false,
     traineeId,
     currentStepId,
+    readOnly = false,
     open,
     onOpenChange,
 }: {
     category: ProgressCategory;
+    /** True inside an optional station, whose own progress is still shown. */
+    includeOptional?: boolean;
     traineeId: number;
     currentStepId: number | null;
+    readOnly?: boolean;
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
     const colors = categoryColorClasses(category.color);
-    const count = leafCount(category.items);
+    const count = leafCount(category.items, includeOptional);
     const allDone = count.total > 0 && count.done === count.total;
 
     return (
@@ -101,6 +80,7 @@ export function CategorySection({
                         item={item}
                         traineeId={traineeId}
                         currentStepId={currentStepId}
+                        readOnly={readOnly}
                     />
                 ))}
             </CollapsibleContent>

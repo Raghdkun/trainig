@@ -301,9 +301,7 @@ export function MediaManager({ item }: { item: ChecklistItem }) {
                         type="submit"
                         size="sm"
                         disabled={
-                            form.processing ||
-                            uploading ||
-                            fileError !== null
+                            form.processing || uploading || fileError !== null
                         }
                     >
                         {uploading ? 'Uploading…' : 'Add'}

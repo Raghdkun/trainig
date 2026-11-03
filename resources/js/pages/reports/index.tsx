@@ -4,9 +4,12 @@ import { useState } from 'react';
 import Heading from '@/components/heading';
 import { ContentPanel } from '@/components/reports/content-panel';
 import { OverviewPanel } from '@/components/reports/overview-panel';
+import { StoreGroupSelect } from '@/components/reports/store-group-select';
 import { StoresPanel } from '@/components/reports/stores-panel';
 import { TraineesPanel } from '@/components/reports/trainees-panel';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -15,12 +18,15 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { useStoreFilter, useSyncStoreFilter } from '@/hooks/use-store-filter';
 import { exportMethod, index } from '@/routes/reports';
 import type { BreadcrumbItem } from '@/types';
 import type {
+    DevelopmentZoneSummary,
     DistributionBand,
     ImportanceRow,
     ManagerActivityRow,
+    QuizResultsSummary,
     ReportArea,
     ReportFilters,
     ReportOverview,
@@ -40,11 +46,13 @@ type ReportPageProps = {
     overview: ReportOverview;
     trend?: TrendPoint[];
     distribution?: DistributionBand[];
+    developmentZone?: DevelopmentZoneSummary;
     storePerformance?: StorePerformanceRow[];
     managerActivity?: ManagerActivityRow[];
     traineeStatus?: TraineeStatusReport;
     stationInsights?: StationInsights;
     importanceBreakdown?: ImportanceRow[];
+    quizSummary?: QuizResultsSummary;
 };
 
 const AREAS: { value: ReportArea; label: string }[] = [
@@ -67,6 +75,24 @@ export default function ReportsIndex() {
 
     const [area, setArea] = useState<ReportArea>('overview');
 
+    const { setSelectedStoreId } = useStoreFilter();
+    // A group of stores is Reports-only; one store (or all) stays in sync with
+    // the sidebar switcher like every other page.
+    useSyncStoreFilter(
+        filters.stores.length > 1 ? undefined : (filters.stores[0] ?? null),
+    );
+
+    /** Query params for the store selection: one `store`, or a `stores[]` group. */
+    function storeParams(
+        storeIds: number[],
+    ): Record<string, string | string[]> {
+        if (storeIds.length === 1) {
+            return { store: String(storeIds[0]) };
+        }
+
+        return storeIds.length > 1 ? { stores: storeIds.map(String) } : {};
+    }
+
     const csvReportForArea: Record<ReportArea, string> = {
         overview: 'trainees',
         stores: 'stores',
@@ -81,30 +107,46 @@ export default function ReportsIndex() {
             params.set('report', csvReportForArea[area]);
         }
 
-        if (filters.store) {
-            params.set('store', String(filters.store));
-        }
+        Object.entries(storeParams(filters.stores)).forEach(([key, value]) =>
+            Array.isArray(value)
+                ? value.forEach((id) => params.append(`${key}[]`, id))
+                : params.set(key, value),
+        );
 
         if (filters.weeks) {
             params.set('weeks', String(filters.weeks));
         }
 
+        if (filters.includeArchived) {
+            params.set('includeArchived', '1');
+        }
+
         return `${exportMethod().url}?${params.toString()}`;
     }
 
-    function applyFilters(next: { store?: string; weeks?: string }) {
-        const store =
-            next.store ?? (filters.store ? String(filters.store) : 'all');
+    function applyFilters(next: {
+        stores?: number[];
+        weeks?: string;
+        includeArchived?: boolean;
+    }) {
+        const stores = next.stores ?? filters.stores;
         const weeks = next.weeks ?? String(filters.weeks);
+        const includeArchived = next.includeArchived ?? filters.includeArchived;
 
-        const params: Record<string, string> = {};
-
-        if (store !== 'all') {
-            params.store = store;
+        if (next.stores !== undefined) {
+            // One store becomes the app-wide choice; a group is Reports-only,
+            // so the other pages fall back to All stores.
+            setSelectedStoreId(stores.length === 1 ? stores[0] : null);
         }
+
+        const params: Record<string, string | string[]> = storeParams(stores);
 
         if (weeks !== String(weekOptions[0])) {
             params.weeks = weeks;
+        }
+
+        if (includeArchived) {
+            params.includeArchived = '1';
         }
 
         router.get(index().url, params, {
@@ -126,33 +168,12 @@ export default function ReportsIndex() {
                     />
                     <div className="flex flex-wrap items-center gap-2">
                         {canChooseStore && storeOptions.length > 0 && (
-                            <Select
-                                value={
-                                    filters.store
-                                        ? String(filters.store)
-                                        : 'all'
-                                }
-                                onValueChange={(store) =>
-                                    applyFilters({ store })
-                                }
-                            >
-                                <SelectTrigger className="w-40">
-                                    <SelectValue placeholder="All stores" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All stores
-                                    </SelectItem>
-                                    {storeOptions.map((store) => (
-                                        <SelectItem
-                                            key={store.id}
-                                            value={String(store.id)}
-                                        >
-                                            {store.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <StoreGroupSelect
+                                key={filters.stores.join(',')}
+                                options={storeOptions}
+                                value={filters.stores}
+                                onApply={(stores) => applyFilters({ stores })}
+                            />
                         )}
                         <Select
                             value={String(filters.weeks)}
@@ -172,6 +193,17 @@ export default function ReportsIndex() {
                                 ))}
                             </SelectContent>
                         </Select>
+                        <Label className="flex items-center gap-2 text-sm font-normal text-muted-foreground">
+                            <Checkbox
+                                checked={filters.includeArchived}
+                                onCheckedChange={(checked) =>
+                                    applyFilters({
+                                        includeArchived: checked === true,
+                                    })
+                                }
+                            />
+                            Include archived
+                        </Label>
                         <Button variant="outline" size="icon" asChild>
                             <a
                                 href={exportHref('csv')}
@@ -216,6 +248,7 @@ export default function ReportsIndex() {
                         overview={overview}
                         trend={props.trend}
                         distribution={props.distribution}
+                        developmentZone={props.developmentZone}
                     />
                 )}
                 {area === 'stores' && (
@@ -232,6 +265,7 @@ export default function ReportsIndex() {
                     <ContentPanel
                         insights={props.stationInsights}
                         importance={props.importanceBreakdown}
+                        quiz={props.quizSummary}
                     />
                 )}
             </div>

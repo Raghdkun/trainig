@@ -20,6 +20,10 @@ class ChecklistItemController extends Controller
         $data = $request->validated();
         $parentId = $data['parent_id'] ?? null;
 
+        if ($this->isUncounted($parentId)) {
+            $data['counts_toward_progress'] = false;
+        }
+
         $category->checklistItems()->create([
             ...$data,
             'order' => (int) ChecklistItem::where('category_id', $category->id)
@@ -34,7 +38,25 @@ class ChecklistItemController extends Controller
 
     public function update(ChecklistItemRequest $request, ChecklistItem $checklistItem): RedirectResponse
     {
-        $checklistItem->update($request->validated());
+        $data = $request->validated();
+
+        // Sub-items of an optional item are always optional.
+        if ($this->isUncounted($checklistItem->parent_id)) {
+            $data['counts_toward_progress'] = false;
+        }
+
+        $checklistItem->update($data);
+
+        // Sub-items follow their parent, so an item's whole subtree is either
+        // counted or optional — never a mix.
+        if ($checklistItem->wasChanged('counts_toward_progress')) {
+            $descendants = $this->descendantIds([$checklistItem->id]);
+
+            if ($descendants !== []) {
+                ChecklistItem::whereIn('id', $descendants)
+                    ->update(['counts_toward_progress' => $checklistItem->counts_toward_progress]);
+            }
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Checklist item updated.')]);
 
@@ -100,6 +122,15 @@ class ChecklistItemController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Items deleted.')]);
 
         return back();
+    }
+
+    /**
+     * Whether the given parent item is optional (not counted).
+     */
+    private function isUncounted(?int $itemId): bool
+    {
+        return $itemId !== null
+            && ! ChecklistItem::whereKey($itemId)->value('counts_toward_progress');
     }
 
     /**

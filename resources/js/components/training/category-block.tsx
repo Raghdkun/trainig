@@ -55,7 +55,10 @@ export function CategoryBlock({
                 <div className="flex items-center gap-2 p-3">
                     {selection && (
                         <Checkbox
-                            checked={selection.isSelected('category', category.id)}
+                            checked={selection.isSelected(
+                                'category',
+                                category.id,
+                            )}
                             onCheckedChange={() =>
                                 selection.toggle('category', category.id)
                             }

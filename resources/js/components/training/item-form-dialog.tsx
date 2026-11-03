@@ -38,11 +38,14 @@ export function ItemFormDialog({
     categoryId,
     item,
     parentId = null,
+    parentCounts = true,
     trigger,
 }: {
     categoryId: number;
     item?: ChecklistItem;
     parentId?: number | null;
+    /** False when the parent item is optional — its sub-items are optional too. */
+    parentCounts?: boolean;
     trigger: ReactNode;
 }) {
     const [open, setOpen] = useState(false);
@@ -51,6 +54,8 @@ export function ItemFormDialog({
         content: item?.content ?? '',
         importance: (item?.importance ?? 'none') as ImportanceChoice,
         requires_rating: item?.requires_rating ?? true,
+        counts_toward_progress:
+            parentCounts && (item?.counts_toward_progress ?? true),
         parent_id: item?.parent_id ?? parentId,
     });
 
@@ -177,11 +182,40 @@ export function ItemFormDialog({
                                 Requires a score
                             </Label>
                             <p className="text-xs text-muted-foreground">
-                                When off, the manager just checks this step
-                                done — no score or note needed.
+                                When off, the manager just checks this step done
+                                — no score or note needed.
+                            </p>
+                            <InputError message={form.errors.requires_rating} />
+                        </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 rounded-md border p-3">
+                        <Checkbox
+                            id="item-counts"
+                            checked={form.data.counts_toward_progress}
+                            disabled={!parentCounts}
+                            onCheckedChange={(value) =>
+                                form.setData(
+                                    'counts_toward_progress',
+                                    value === true,
+                                )
+                            }
+                            className="mt-0.5"
+                        />
+                        <div className="grid gap-1">
+                            <Label
+                                htmlFor="item-counts"
+                                className="font-medium"
+                            >
+                                Counts toward evaluation
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                                {parentCounts
+                                    ? 'When off, this step is optional: it is left out of completion, average score and reports.'
+                                    : 'The parent item is optional, so this sub-item is optional too.'}
                             </p>
                             <InputError
-                                message={form.errors.requires_rating}
+                                message={form.errors.counts_toward_progress}
                             />
                         </div>
                     </div>

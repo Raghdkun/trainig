@@ -2,6 +2,7 @@ import { router } from '@inertiajs/react';
 import { Trash2, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { InviteUserDialog } from '@/components/dashboard/invite-user-dialog';
+import { PermissionChecklist } from '@/components/dashboard/permission-checklist';
 import { StoreMultiSelect } from '@/components/dashboard/store-multi-select';
 import { Paginator } from '@/components/pagination';
 import { ConfirmDeleteDialog } from '@/components/training/confirm-delete-dialog';
@@ -18,6 +19,8 @@ import { destroy, update } from '@/routes/admin/users';
 import type { Paginated } from '@/types/pagination';
 import type {
     AdminUserRow,
+    PermissionOption,
+    PermissionValue,
     RoleOption,
     RoleValue,
     StoreOption,
@@ -27,17 +30,29 @@ export function UserManagement({
     users,
     stores,
     roleOptions,
+    permissionOptions,
     currentUserId,
 }: {
     users: Paginated<AdminUserRow>;
     stores: StoreOption[];
     roleOptions: RoleOption[];
+    permissionOptions: PermissionOption[];
     currentUserId: number;
 }) {
-    function save(user: AdminUserRow, role: RoleValue, storeIds: number[]) {
+    function save(
+        user: AdminUserRow,
+        role: RoleValue,
+        storeIds: number[],
+        permissions?: PermissionValue[],
+    ) {
         router.patch(
             update(user.id).url,
-            { role, store_ids: role === 'manager' ? storeIds : [] },
+            {
+                role,
+                store_ids: role === 'manager' ? storeIds : [],
+                // Left out, the server keeps the user's current permissions.
+                ...(permissions !== undefined && { permissions }),
+            },
             {
                 preserveScroll: true,
                 // Without this the row silently snaps back (e.g. unchecking a
@@ -72,11 +87,12 @@ export function UserManagement({
                         <h2 className="font-semibold tracking-tight">Team</h2>
                         <p className="truncate text-sm text-muted-foreground">
                             {users.total} member{users.total === 1 ? '' : 's'} ·
-                            roles &amp; store access
+                            roles, store access &amp; permissions
                         </p>
                     </div>
                     <InviteUserDialog
                         roleOptions={roleOptions}
+                        permissionOptions={permissionOptions}
                         stores={stores}
                         trigger={
                             <Button size="sm" className="shrink-0">
@@ -94,7 +110,7 @@ export function UserManagement({
                         return (
                             <li
                                 key={user.id}
-                                className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_9rem_11rem_auto] lg:items-center lg:gap-4"
+                                className="grid gap-3 p-4 xl:grid-cols-[minmax(0,1fr)_9rem_11rem_10rem_auto] xl:items-center xl:gap-4"
                             >
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-2">
@@ -112,7 +128,7 @@ export function UserManagement({
                                     </span>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-2 lg:contents">
+                                <div className="grid grid-cols-2 gap-2 xl:contents">
                                     <Select
                                         value={user.role}
                                         disabled={isSelf}
@@ -156,31 +172,57 @@ export function UserManagement({
                                     )}
                                 </div>
 
-                                <div className="flex justify-end">
-                                    {!isSelf && (
-                                        <ConfirmDeleteDialog
-                                            title="Remove user?"
-                                            description={`This permanently deletes ${user.name}'s account.`}
-                                            onConfirm={(close) =>
-                                                router.delete(
-                                                    destroy(user.id).url,
-                                                    {
-                                                        preserveScroll: true,
-                                                        onSuccess: close,
-                                                    },
+                                {/* Stacked: permissions and delete share a line. */}
+                                <div className="flex items-center justify-between gap-3 xl:contents">
+                                    {user.role === 'manager' ? (
+                                        <PermissionChecklist
+                                            compact
+                                            idPrefix={`user-${user.id}-permission`}
+                                            options={permissionOptions}
+                                            value={user.permissions}
+                                            onChange={(permissions) =>
+                                                save(
+                                                    user,
+                                                    'manager',
+                                                    user.stores.map(
+                                                        (store) => store.id,
+                                                    ),
+                                                    permissions,
                                                 )
                                             }
-                                            trigger={
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="text-muted-foreground hover:text-destructive"
-                                                >
-                                                    <Trash2 className="size-4" />
-                                                </Button>
-                                            }
                                         />
+                                    ) : (
+                                        <span className="text-sm text-muted-foreground">
+                                            All permissions
+                                        </span>
                                     )}
+
+                                    <div className="flex justify-end">
+                                        {!isSelf && (
+                                            <ConfirmDeleteDialog
+                                                title="Remove user?"
+                                                description={`This permanently deletes ${user.name}'s account.`}
+                                                onConfirm={(close) =>
+                                                    router.delete(
+                                                        destroy(user.id).url,
+                                                        {
+                                                            preserveScroll: true,
+                                                            onSuccess: close,
+                                                        },
+                                                    )
+                                                }
+                                                trigger={
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="text-muted-foreground hover:text-destructive"
+                                                    >
+                                                        <Trash2 className="size-4" />
+                                                    </Button>
+                                                }
+                                            />
+                                        )}
+                                    </div>
                                 </div>
                             </li>
                         );
@@ -189,7 +231,11 @@ export function UserManagement({
 
                 {users.last_page > 1 && (
                     <div className="border-t border-border/60 p-4">
-                        <Paginator paginator={users} only="users" label="users" />
+                        <Paginator
+                            paginator={users}
+                            only="users"
+                            label="users"
+                        />
                     </div>
                 )}
             </div>

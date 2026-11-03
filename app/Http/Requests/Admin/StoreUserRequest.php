@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Enums\Permission;
 use App\Enums\Role;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -21,6 +22,8 @@ class StoreUserRequest extends FormRequest
             'role' => ['required', new Enum(Role::class)],
             'store_ids' => ['array', Rule::requiredIf($this->input('role') === Role::Manager->value)],
             'store_ids.*' => ['integer', 'exists:stores,id'],
+            'permissions' => ['sometimes', 'array'],
+            'permissions.*' => ['distinct', new Enum(Permission::class)],
         ];
     }
 }

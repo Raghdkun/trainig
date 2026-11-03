@@ -90,6 +90,26 @@ export type ImportanceRow = {
     evaluations: number;
 };
 
-export type ReportFilters = { store: number | null; weeks: number };
+export type DevelopmentZoneSummary = {
+    pending: number;
+    active: number;
+    completed: number;
+    in_zone: number;
+    average_evaluation_rating: number | null;
+    plan_completion: number;
+};
+
+export type QuizResultsSummary = {
+    sent: number;
+    completed: number;
+    average_score: number | null;
+};
+
+export type ReportFilters = {
+    /** Stores combined in the report; empty means all stores. */
+    stores: number[];
+    weeks: number;
+    includeArchived: boolean;
+};
 
 export type ReportArea = 'overview' | 'stores' | 'trainees' | 'content';

@@ -42,7 +42,10 @@ export function MediaAttachments({ media }: { media: MediaItem[] }) {
                             key={m.id}
                             className="w-full max-w-md min-w-0 basis-full"
                         >
-                            <VideoPlayer src={url} label={m.label ?? undefined} />
+                            <VideoPlayer
+                                src={url}
+                                label={m.label ?? undefined}
+                            />
                             {m.label && (
                                 <p className="mt-1 truncate text-xs text-muted-foreground">
                                     {m.label}

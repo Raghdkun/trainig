@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\Permission;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreUserRequest;
@@ -23,6 +24,7 @@ class UserController extends Controller
             'email' => $request->validated('email'),
             'password' => Hash::make($request->validated('password')),
             'role' => $role,
+            'permissions' => $this->grantablePermissions($role, $request->validated('permissions', [])),
             'email_verified_at' => now(),
         ]);
 
@@ -42,6 +44,13 @@ class UserController extends Controller
 
         $role = Role::from($request->validated('role'));
         $user->role = $role;
+
+        if ($role !== Role::Manager) {
+            $user->permissions = null;
+        } elseif ($request->has('permissions')) {
+            $user->permissions = $this->grantablePermissions($role, $request->validated('permissions', []));
+        }
+
         $user->save();
 
         $user->stores()->sync($role === Role::Manager ? $request->validated('store_ids', []) : []);
@@ -62,5 +71,21 @@ class UserController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('User removed.')]);
 
         return back();
+    }
+
+    /**
+     * Only managers carry granted permissions; super admins already hold
+     * every permission, so nothing is stored for them.
+     *
+     * @param  array<int, string>  $values
+     * @return list<Permission>|null
+     */
+    private function grantablePermissions(Role $role, array $values): ?array
+    {
+        if ($role !== Role::Manager) {
+            return null;
+        }
+
+        return array_values(array_map(fn (string $value): Permission => Permission::from($value), $values));
     }
 }

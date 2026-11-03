@@ -3,15 +3,19 @@ import {
     BarChart3,
     // BookOpen,
     Building2,
+    Archive,
     ClipboardList,
+    FileQuestion,
     // FolderGit2,
     LayoutGrid,
+    TrendingUp,
     Users,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
+import { StoreSwitcher } from '@/components/store-switcher';
 import {
     Sidebar,
     SidebarContent,
@@ -23,15 +27,21 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { management } from '@/routes/admin';
+import { index as developmentZoneIndex } from '@/routes/development-zone';
 import { index as reportsIndex } from '@/routes/reports';
 import { index as traineesIndex } from '@/routes/trainees';
+import { index as archiveRequestsIndex } from '@/routes/training/archive-requests';
+import { index as quizResultsIndex } from '@/routes/training/quiz-results';
 import { index as sectionsIndex } from '@/routes/training/sections';
 import type { Auth, NavItem } from '@/types';
 
 const footerNavItems: NavItem[] = [];
 
 export function AppSidebar() {
-    const { auth } = usePage<{ auth: Auth }>().props;
+    const { auth, pendingArchiveRequests } = usePage<{
+        auth: Auth;
+        pendingArchiveRequests: number | null;
+    }>().props;
 
     const mainNavItems: NavItem[] = [
         {
@@ -43,6 +53,11 @@ export function AppSidebar() {
             title: 'Trainees',
             href: traineesIndex(),
             icon: Users,
+        },
+        {
+            title: 'Development Zone',
+            href: developmentZoneIndex(),
+            icon: TrendingUp,
         },
         {
             title: 'Reports',
@@ -63,6 +78,17 @@ export function AppSidebar() {
                 href: management(),
                 icon: Building2,
             },
+            {
+                title: 'Quiz Results',
+                href: quizResultsIndex(),
+                icon: FileQuestion,
+            },
+            {
+                title: 'Archive Requests',
+                href: archiveRequestsIndex(),
+                icon: Archive,
+                badge: pendingArchiveRequests || null,
+            },
         );
     }
 
@@ -77,6 +103,7 @@ export function AppSidebar() {
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
+                    <StoreSwitcher />
                 </SidebarMenu>
             </SidebarHeader>
 

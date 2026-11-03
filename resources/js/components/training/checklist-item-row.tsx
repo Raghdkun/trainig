@@ -5,6 +5,7 @@ import { ConfirmDeleteDialog } from '@/components/training/confirm-delete-dialog
 import { ImportanceBadge } from '@/components/training/importance-badge';
 import { ItemFormDialog } from '@/components/training/item-form-dialog';
 import { MediaManager } from '@/components/training/media-manager';
+import { OptionalBadge } from '@/components/training/optional-badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useSortable } from '@/hooks/use-sortable';
@@ -18,11 +19,14 @@ export function ChecklistItemRow({
     categoryId,
     dragProps,
     isSub = false,
+    parentCounts = true,
 }: {
     item: ChecklistItem;
     categoryId: number;
     dragProps: SortableHandleProps;
     isSub?: boolean;
+    /** False when this is a sub-item of an optional item. */
+    parentCounts?: boolean;
 }) {
     const children = item.children ?? [];
     const selection = useBuilderSelection();
@@ -48,7 +52,9 @@ export function ChecklistItemRow({
                 {!isSub && selection && (
                     <Checkbox
                         checked={selection.isSelected('item', item.id)}
-                        onCheckedChange={() => selection.toggle('item', item.id)}
+                        onCheckedChange={() =>
+                            selection.toggle('item', item.id)
+                        }
                         onClick={(e) => e.stopPropagation()}
                         aria-label={`Select ${item.title}`}
                         className="mt-0.5 shrink-0"
@@ -62,6 +68,7 @@ export function ChecklistItemRow({
                             {item.title}
                         </span>
                         <ImportanceBadge importance={item.importance} />
+                        {!item.counts_toward_progress && <OptionalBadge />}
                     </div>
 
                     {item.content && (
@@ -77,6 +84,7 @@ export function ChecklistItemRow({
                     <ItemFormDialog
                         categoryId={categoryId}
                         item={item}
+                        parentCounts={parentCounts}
                         trigger={
                             <Button variant="ghost" size="icon">
                                 <Pencil className="size-4" />
@@ -114,11 +122,13 @@ export function ChecklistItemRow({
                             categoryId={categoryId}
                             dragProps={childProps(child.id)}
                             isSub
+                            parentCounts={item.counts_toward_progress}
                         />
                     ))}
                     <ItemFormDialog
                         categoryId={categoryId}
                         parentId={item.id}
+                        parentCounts={item.counts_toward_progress}
                         trigger={
                             <Button
                                 variant="ghost"
